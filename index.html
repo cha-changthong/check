@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>ระบบลงเวลาทำงาน Check-in / Check-out</title>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100dvh; /* รองรับความสูงหน้าจอมือถือจริง */
+      overflow: hidden;
+      background-color: #0f172a;
+    }
+    #appFrame {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      border: none;
+      display: block;
+    }
+    /* หน้าจอโหลดระหว่างรอ Apps Script */
+    #loadingScreen {
+      position: fixed;
+      inset: 0;
+      background-color: #0f172a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-family: system-ui, -apple-system, sans-serif;
+      z-index: 99;
+      transition: opacity 0.4s ease;
+    }
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 4px solid rgba(255, 255, 255, 0.15);
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading Animation -->
+  <div id="loadingScreen">
+    <div class="spinner"></div>
+    <p style="font-size: 15px; font-weight: 500; letter-spacing: 0.5px;">กำลังเปิดระบบ...</p>
+  </div>
+
+  <!-- iFrame รองรับ Camera & GPS -->
+  <iframe 
+    id="appFrame" 
+    src=""
+    allow="geolocation *; camera *; microphone *; clipboard-write *"
+    allowfullscreen
+    onload="hideLoading()">
+  </iframe>
+
+  <script>
+    // ⚙️ 1. ใส่ URL Web App ของคุณที่ได้จากการ Deploy Google Apps Script (/exec)
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxIadAegPme3e6ESzN9GsmTZbrUILtOyajVTcXcEFNaC_HnxCli1Uls5juL8s7KrS3t/exec";
+
+    // 2. ดึงค่า Query Parameter จาก URL เช่น ?fn=dashbord แล้วส่งต่อเข้า iFrame อัตโนมัติ
+    const currentParams = window.location.search;
+    const finalUrl = GAS_URL + currentParams;
+
+    // 3. โหลดหน้าเว็บ
+    const frame = document.getElementById("appFrame");
+    frame.src = finalUrl;
+
+    function hideLoading() {
+      const loader = document.getElementById("loadingScreen");
+      if (loader) {
+        loader.style.opacity = "0";
+        setTimeout(() => {
+          loader.style.display = "none";
+        }, 400);
+      }
+    }
+  </script>
+</body>
+</html>
