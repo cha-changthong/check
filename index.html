@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ระบบลงเวลาทำงาน Check-in / Check-out</title>
   
+  <!-- ⭐️ 1. ไอคอน Favicon สำหรับแท็บเบราว์เซอร์ -->
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="shortcut icon" type="image/png" href="favicon.png">
+
+  <!-- 📱 2. ไอคอนสำหรับเวลาบันทึกลงหน้าจอมือถือ (Add to Home Screen) -->
+  <link rel="apple-touch-icon" href="favicon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <style>
     * {
       margin: 0;
@@ -14,7 +24,7 @@
     html, body {
       width: 100%;
       height: 100%;
-      height: 100dvh; /* รองรับความสูงหน้าจอมือถือจริง */
+      height: 100dvh;
       overflow: hidden;
       background-color: #0f172a;
     }
@@ -25,7 +35,6 @@
       border: none;
       display: block;
     }
-    /* หน้าจอโหลดระหว่างรอ Apps Script */
     #loadingScreen {
       position: fixed;
       inset: 0;
@@ -71,14 +80,13 @@
   </iframe>
 
   <script>
-    // ⚙️ 1. ใส่ URL Web App ของคุณที่ได้จากการ Deploy Google Apps Script (/exec)
+    // ⚙️ ใส่ URL Web App ของคุณที่ได้จากการ Deploy Google Apps Script (/exec)
     const GAS_URL = "https://script.google.com/macros/s/AKfycbxIadAegPme3e6ESzN9GsmTZbrUILtOyajVTcXcEFNaC_HnxCli1Uls5juL8s7KrS3t/exec";
 
-    // 2. ดึงค่า Query Parameter จาก URL เช่น ?fn=dashbord แล้วส่งต่อเข้า iFrame อัตโนมัติ
+    // ส่งต่อ Query Parameter จาก URL เช่น ?fn=dashbord หรือ ?openExternalBrowser=1 เข้า iFrame
     const currentParams = window.location.search;
     const finalUrl = GAS_URL + currentParams;
 
-    // 3. โหลดหน้าเว็บ
     const frame = document.getElementById("appFrame");
     frame.src = finalUrl;
 
