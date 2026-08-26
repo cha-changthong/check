@@ -380,9 +380,17 @@
               .withFailureHandler(handleProfileFallback)
               .getEmployeeProfile(lineUserId, lineDisplayName, pictureUrl);
           } else if (GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
-            // รองรับ GitHub Pages ผ่าน fetch GET API
-            const apiUrl = `${GAS_URL}?action=getEmployeeProfile&userId=${encodeURIComponent(lineUserId)}&name=${encodeURIComponent(lineDisplayName)}&pic=${encodeURIComponent(pictureUrl)}`;
-            fetch(apiUrl)
+            // รองรับ GitHub Pages ผ่าน fetch POST API
+            fetch(GAS_URL, {
+              method: "POST",
+              headers: { "Content-Type": "text/plain;charset=utf-8" },
+              body: JSON.stringify({
+                action: "getEmployeeProfile",
+                userId: lineUserId,
+                displayName: lineDisplayName,
+                pictureUrl: pictureUrl
+              })
+            })
               .then(res => res.json())
               .then(handleProfileSuccess)
               .catch(handleProfileFallback);
@@ -965,6 +973,7 @@
       } else if (GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
         fetch(GAS_URL, {
           method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify(payload)
         })
         .then(res => res.json())
