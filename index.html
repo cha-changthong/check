@@ -2,71 +2,976 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ทดสอบ LINE LIFF</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ระบบ Check-in / Check-out เข้า-ออกงาน</title>
+  
+  <!-- Google Fonts: Prompt -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <!-- LINE LIFF SDK v2 -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <style>
+    * {
+      font-family: 'Prompt', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background: linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%);
+      min-height: 100vh;
+    }
+    .btn-touch {
+      min-height: 54px;
+      font-size: 1.15rem;
+    }
+    .input-touch {
+      min-height: 52px;
+      font-size: 1.1rem;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+    .gps-active {
+      animation: pulse-ring 2s infinite;
+    }
+    .theme-transition {
+      transition: background 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+    }
+  </style>
 </head>
-<body class="bg-slate-100 min-h-screen flex items-center justify-center p-4">
+<body class="p-3 sm:p-5 flex justify-center items-start">
 
-  <div class="bg-white max-w-md w-full rounded-3xl p-6 shadow-xl text-center space-y-4">
-    <h1 class="text-xl font-bold text-slate-800">ทดสอบ LINE LIFF</h1>
+  <!-- Main Container Card -->
+  <div class="w-full max-w-lg bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 mb-8">
+    
+    <!-- Top Action Selector (Check-in / Check-out Toggle) -->
+    <div class="p-3 bg-slate-100 border-b border-slate-200">
+      <div class="grid grid-cols-2 gap-2 bg-slate-200/80 p-1.5 rounded-2xl">
+        <button type="button" id="tabCheckIn" onclick="switchActionType('Check-in')" class="py-3 px-4 rounded-xl font-bold text-base flex items-center justify-center space-x-2 transition-all duration-300 bg-emerald-600 text-white shadow-md">
+          <i class="fa-solid fa-right-to-bracket text-lg"></i>
+          <span>Check-in (เข้างาน)</span>
+        </button>
 
-    <!-- ช่องใส่ LIFF ID สำหรับทดสอบ -->
-    <div class="text-left space-y-1">
-      <label class="text-xs font-semibold text-slate-600">ใส่ LIFF ID ที่ต้องการทดสอบ:</label>
-      <div class="flex space-x-2">
-        <input type="text" id="inputLiffId" value="2011269941-XEOw8aRR" class="flex-1 p-2.5 text-xs font-mono border rounded-xl bg-slate-50 outline-none focus:border-emerald-500">
-        <button onclick="testLiff(document.getElementById('inputLiffId').value)" class="bg-emerald-600 text-white px-4 py-2 text-xs font-bold rounded-xl active:scale-95 transition">
-          ทดสอบ
+        <button type="button" id="tabCheckOut" onclick="switchActionType('Check-out')" class="py-3 px-4 rounded-xl font-bold text-base flex items-center justify-center space-x-2 transition-all duration-300 text-slate-600 hover:text-slate-900">
+          <i class="fa-solid fa-right-from-bracket text-lg"></i>
+          <span>Check-out (ออกงาน)</span>
         </button>
       </div>
     </div>
 
-    <!-- กล่องแสดงผล -->
-    <div class="text-left bg-slate-50 p-4 rounded-2xl border text-xs space-y-1.5 font-mono">
-      <p><b>ชื่อ LINE:</b> <span id="resName" class="text-emerald-600 font-bold">-</span></p>
-      <p><b>User ID:</b> <span id="resUid" class="text-slate-700 font-bold break-all">-</span></p>
+    <!-- Header Section (Dynamic Color) -->
+    <div id="headerSection" class="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-6 text-white text-center relative shadow-md theme-transition">
+      <div id="headerIconWrapper" class="inline-flex items-center justify-center w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl mb-2 shadow-inner">
+        <i id="headerIcon" class="fa-solid fa-business-time text-2xl text-white"></i>
+      </div>
+      <h1 id="headerTitle" class="text-2xl font-bold tracking-wide">Check-in เข้างาน</h1>
+      <p id="headerSubtitle" class="text-emerald-100 text-sm mt-1">บันทึกเวลาทำงาน พิกัด และรูปถ่าย</p>
     </div>
 
-    <!-- กล่อง Log สด -->
-    <div class="text-left bg-slate-900 text-emerald-400 p-3 rounded-xl font-mono text-[11px] space-y-1 h-40 overflow-y-auto" id="logBox"></div>
+    <!-- Form Body -->
+    <div class="p-5 sm:p-7 space-y-5">
+      
+      <!-- 1. [โหมด Check-in] ข้อมูลพนักงานผู้ปฏิบัติงาน (ดึงจาก LINE LIFF อัตโนมัติ) -->
+      <div id="employeeNameWrapper">
+        <label class="block text-slate-700 font-semibold text-base mb-2">
+          <i class="fa-solid fa-id-card text-emerald-600 mr-1.5"></i> ข้อมูลพนักงาน (LINE)
+        </label>
+        
+        <!-- LIFF User Profile Card -->
+        <div id="liffProfileCard" class="p-3.5 bg-gradient-to-r from-slate-50 to-emerald-50/50 rounded-2xl border-2 border-emerald-200/80 flex items-center space-x-3.5 shadow-sm">
+          <div class="relative flex-shrink-0">
+            <img id="liffUserImg" src="https://ui-avatars.com/api/?name=User&background=059669&color=fff&rounded=true" alt="Profile" class="w-12 h-12 rounded-full object-cover border-2 border-white shadow">
+            <div id="liffStatusDot" class="w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white absolute bottom-0 right-0"></div>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center space-x-1.5">
+              <h3 id="displayEmployeeName" class="font-bold text-slate-800 text-lg truncate">กำลังเชื่อมต่อ LINE...</h3>
+              <span id="mappedBadge" class="hidden text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold border border-emerald-200">แมปชื่อแล้ว</span>
+            </div>
+            <p id="displayLineName" class="text-xs text-slate-500 truncate flex items-center mt-0.5">
+              <i class="fa-brands fa-line text-emerald-500 mr-1 text-sm"></i>
+              <span id="lineDisplayNameText">LINE Account</span>
+            </p>
+            <p id="liffDebugStatus" class="text-[10px] text-slate-400 mt-0.5 truncate font-mono"></p>
+          </div>
+        </div>
+
+        <!-- Hidden Inputs for form values -->
+        <input type="hidden" id="employeeName" value="">
+        <input type="hidden" id="lineUserId" value="">
+      </div>
+
+      <!-- 2. [โหมด Check-out] กล่องเลือกงานที่ Check-in ค้างอยู่ -->
+      <div id="activeJobWrapper" class="hidden space-y-3">
+        <div class="flex items-center justify-between">
+          <label class="block text-slate-700 font-semibold text-base">
+            <i class="fa-solid fa-clipboard-check text-rose-600 mr-1.5"></i> เลือกงานที่ Check-in ค้างอยู่ <span class="text-red-500">*</span>
+          </label>
+          <button type="button" onclick="fetchActiveJobs(true)" class="text-xs text-rose-600 hover:text-rose-800 font-medium flex items-center bg-rose-50 px-2.5 py-1 rounded-lg">
+            <i class="fa-solid fa-rotate mr-1"></i> โหลดใหม่
+          </button>
+        </div>
+        <div class="relative">
+          <select id="activeJobSelect" onchange="handleActiveJobChange()" class="input-touch w-full px-4 rounded-2xl border-2 border-rose-200 focus:border-rose-500 focus:ring-4 focus:ring-rose-100 outline-none text-slate-800 bg-rose-50/50 font-medium transition cursor-pointer appearance-none truncate">
+            <option value="" disabled selected>-- กำลังโหลดรายการงาน... --</option>
+          </select>
+          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+            <i class="fa-solid fa-chevron-down text-sm"></i>
+          </div>
+        </div>
+
+        <div id="selectedJobInfoCard" class="hidden p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5 text-xs sm:text-sm">
+          <div class="flex justify-between items-center text-slate-500 font-medium">
+            <span><i class="fa-solid fa-user mr-1 text-slate-400"></i>พนักงาน: <b id="infoEmpName" class="text-slate-800">-</b></span>
+            <span><i class="fa-regular fa-clock mr-1 text-slate-400"></i>เวลาเข้า: <b id="infoCheckInTime" class="text-slate-800">-</b></span>
+          </div>
+          <div class="text-slate-600 pt-1">
+            <span class="font-semibold text-slate-500 block">งานตอนเข้างาน:</span>
+            <p id="infoJobDetails" class="bg-white p-2.5 rounded-xl border border-slate-200 text-slate-700 mt-1 whitespace-pre-wrap leading-relaxed">-</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- กล้องสด (WebRTC Live Stream) -->
+      <div>
+        <label id="photoLabel" class="block text-slate-700 font-semibold text-base mb-2">
+          <i class="fa-solid fa-camera text-slate-600 mr-1.5"></i> ภาพถ่ายสถานที่เข้างาน <span class="text-red-500">*</span>
+        </label>
+
+        <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleImageSelected(event)">
+
+        <div id="captureTriggerBox">
+          <button type="button" onclick="startLiveCamera()" class="btn-touch w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-2xl shadow-lg active:scale-[0.98] transition flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-camera text-xl"></i>
+            <span>กดถ่ายรูปสด (เปิดกล้องทันที)</span>
+          </button>
+          <p class="text-xs text-slate-400 text-center mt-1.5">* ระบบถ่ายสดเท่านั้น ไม่สามารถเลือกรูปจากอัลบั้มได้</p>
+        </div>
+
+        <div id="previewContainer" class="hidden mt-3 relative rounded-2xl overflow-hidden border-2 border-dashed border-slate-300 bg-slate-100">
+          <img id="previewImage" src="" alt="รูปถ่าย" class="w-full max-h-80 object-cover object-center rounded-2xl">
+          <div class="absolute bottom-3 right-3 flex space-x-2">
+            <button type="button" onclick="startLiveCamera()" class="bg-black/75 hover:bg-black text-white px-4 py-2 rounded-xl text-sm font-medium backdrop-blur-md shadow-md active:scale-95 transition flex items-center space-x-1">
+              <i class="fa-solid fa-arrows-rotate"></i>
+              <span>ถ่ายใหม่</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- รายละเอียดงาน -->
+      <div>
+        <label id="jobDetailsLabel" class="block text-slate-700 font-semibold text-base mb-2">
+          <i class="fa-solid fa-clipboard-list text-slate-600 mr-1.5"></i> รายละเอียดของงาน <span class="text-red-500">*</span>
+        </label>
+        <textarea id="jobDetails" rows="3" placeholder="ระบุรายละเอียด..." class="w-full p-4 rounded-2xl border-2 border-slate-200 focus:border-slate-500 focus:ring-4 focus:ring-slate-100 outline-none text-slate-800 bg-slate-50 font-normal text-base transition resize-none"></textarea>
+      </div>
+
+      <!-- Submit Button & Live Timer -->
+      <div class="pt-2">
+        <button id="btnSubmit" onclick="handleSubmit()" type="button" class="btn-touch w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-xl shadow-emerald-500/25 active:scale-[0.98] transition flex items-center justify-center space-x-2 text-lg theme-transition">
+          <i id="btnSubmitIcon" class="fa-solid fa-paper-plane"></i>
+          <span id="btnSubmitText">ส่งงาน Check-in (เข้างาน)</span>
+        </button>
+
+        <!-- ⏱️ Live Countdown Timer (1.30 นาที: 01:30) -->
+        <div class="flex items-center justify-center space-x-1.5 mt-2.5 text-xs text-slate-400 select-none">
+          <i class="fa-regular fa-clock text-[11px]"></i>
+          <span>หมดเวลาใน:</span>
+          <span id="timerCountdownText" class="font-semibold text-slate-500 tracking-wider">01:30</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Live Camera Fullscreen Modal -->
+  <div id="liveCameraModal" class="hidden fixed inset-0 z-50 bg-black flex flex-col justify-between">
+    <div class="p-4 flex items-center justify-between text-white bg-black/50 backdrop-blur-md z-10">
+      <span class="font-bold text-sm sm:text-base flex items-center">
+        <i class="fa-solid fa-circle-dot text-red-500 mr-2 animate-pulse"></i> กล้องสด Check-in / Out
+      </span>
+      <button onclick="stopLiveCamera()" class="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-xl active:scale-90 transition">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="relative flex-1 flex items-center justify-center overflow-hidden bg-black">
+      <video id="cameraVideo" autoplay playsinline class="w-full h-full object-cover"></video>
+      <canvas id="captureCanvas" class="hidden"></canvas>
+    </div>
+
+    <div class="p-6 bg-black/80 backdrop-blur-md flex items-center justify-around z-10">
+      <button onclick="switchCameraFacing()" class="w-12 h-12 rounded-full bg-white/20 text-white flex items-center justify-center text-xl active:scale-90 transition">
+        <i class="fa-solid fa-camera-rotate"></i>
+      </button>
+      <button onclick="takeSnapshot()" class="w-20 h-20 rounded-full border-4 border-white bg-white/30 flex items-center justify-center active:scale-95 transition shadow-2xl">
+        <div class="w-16 h-16 rounded-full bg-white active:scale-90 transition"></div>
+      </button>
+      <div class="w-12 h-12"></div>
+    </div>
+  </div>
+
+  <!-- Fullscreen Modal when Location is Blocked -->
+  <div id="locationBlockedModal" class="hidden fixed inset-0 z-50 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl space-y-4">
+      <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-3xl shadow-inner">
+        <i class="fa-solid fa-location-dot"></i>
+      </div>
+      <h2 class="text-xl font-bold text-slate-800">จำเป็นต้องเปิด GPS</h2>
+      <p class="text-slate-600 text-sm leading-relaxed">
+        ระบบต้องการสิทธิ์เข้าถึงตำแหน่ง (GPS) เพื่อบันทึกพิกัดทำงาน กรุณากดปุ่มด้านล่างเพื่ออนุญาตสิทธิ์
+      </p>
+      <div class="pt-2 space-y-2">
+        <button onclick="initGPS(true)" class="btn-touch w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg active:scale-95 transition">
+          <i class="fa-solid fa-location-arrow mr-1.5"></i> อนุญาตและดึงพิกัดใหม่
+        </button>
+        <p class="text-xs text-slate-400">หากกดยกเลิกไปแล้ว ให้ไปที่การตั้งค่าสิทธิ์เบราว์เซอร์เพื่อเปิดตำแหน่ง</p>
+      </div>
+    </div>
   </div>
 
   <script>
-    function log(msg) {
-      const box = document.getElementById("logBox");
-      box.innerHTML += `<div>> ${msg}</div>`;
-      box.scrollTop = box.scrollHeight;
-    }
+    let currentActionType = "Check-in";
+    let currentPosition = null;
+    let base64Image = null;
+    let imageMimeType = "image/jpeg";
+    
+    let videoStream = null;
+    let currentFacingMode = "environment";
+    let activeJobsList = [];
 
-    async function testLiff(id) {
-      log("--- เริ่มทดสอบ LIFF ID: " + id + " ---");
+    // 🌐 ตั้งค่า URL สำหรับ GitHub Pages และ LINE LIFF
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxIadAegPme3e6ESzN9GsmTZbrUILtOyajVTcXcEFNaC_HnxCli1Uls5juL8s7KrS3t/exec"; // นำ Web App URL ของ Apps Script มาใส่ที่นี่
+    let liffId = "2011269941-XEOw8aRR"; // LIFF ID ที่ถูกต้อง
+
+    let currentLineUserId = "";
+    let currentEmployeeName = "";
+
+    // ⏱️ ตัวแปรนับเวลาถอยหลัง 1.30 นาที (90 วินาที)
+    let timerInterval = null;
+    let remainingSeconds = 90;
+
+    // ดึงข้อมูล Active Jobs ล่วงหน้า
+    let preloadedActive = null;
+    try {
+      preloadedActive = <?!= initialActiveJobs ?>;
+    } catch (e) {}
+
+    // เริ่มการทำงานทันทีที่เปิดหน้าเว็บ
+    document.addEventListener("DOMContentLoaded", () => {
+      // 1. เชื่อมต่อ LINE LIFF เพื่อดึง User ID
+      initLineLiff();
+      
+      // 2. ขอสิทธิ์ GPS ทันทีที่เปิดหน้าเว็บ (ทำงานเบื้องหลัง)
+      initGPS(false);
+
+      if (preloadedActive && preloadedActive.status === "success" && Array.isArray(preloadedActive.data)) {
+        activeJobsList = preloadedActive.data;
+        populateActiveJobsDropdown();
+      } else {
+        fetchActiveJobs(false);
+      }
+
+      updateTheme();
+      startSessionTimeout();
+    });
+
+    /**
+     * 🟢 เชื่อมต่อ LINE LIFF และดึงชื่อพนักงานจริงจาก Sheet "Users"
+     */
+    async function initLineLiff() {
+      const displayEmp = document.getElementById("displayEmployeeName");
+      const displayLine = document.getElementById("lineDisplayNameText");
+      const debugStatus = document.getElementById("liffDebugStatus");
+      const empInput = document.getElementById("employeeName");
+
       try {
-        await liff.init({ liffId: id.trim() });
-        log("✅ liff.init() สำเร็จ!");
+        let activeLiffId = (typeof liffId !== "undefined" ? liffId : "").trim();
+        if (!activeLiffId || activeLiffId.includes("YOUR_LIFF_ID_HERE")) {
+          displayEmp.innerText = "ยังไม่ได้ใส่ LIFF ID";
+          displayLine.innerText = "ใส่ LIFF ID ในโค้ด";
+          debugStatus.innerText = "สถานะ: รอตั้งค่า LIFF ID";
+          empInput.value = "ผู้ทดสอบระบบ";
+          currentEmployeeName = "ผู้ทดสอบระบบ";
+          return;
+        }
 
-        if (!liff.isLoggedIn()) {
-          log("⚠️ ยังไม่ Login -> กำลังสั่ง liff.login()...");
+        if (typeof liff === "undefined") {
+          displayEmp.innerText = "ไม่ได้โหลด LIFF SDK";
+          displayLine.innerText = "เปิดผ่านเบราว์เซอร์ทั่วไป";
+          debugStatus.innerText = "สถานะ: เบราว์เซอร์ทั่วไป";
+          empInput.value = "ผู้ใช้งานทั่วไป";
+          currentEmployeeName = "ผู้ใช้งานทั่วไป";
+          return;
+        }
+
+        // เริ่มต้นเชื่อมต่อ LINE LIFF
+        await liff.init({ liffId: activeLiffId });
+
+        if (!liff.isInClient() && !liff.isLoggedIn()) {
           liff.login();
           return;
         }
 
-        const profile = await liff.getProfile();
-        document.getElementById("resName").innerText = profile.displayName;
-        document.getElementById("resUid").innerText = profile.userId;
-        log("🎉 ได้ User ID: " + profile.userId);
-        log("🎉 ได้ชื่อ: " + profile.displayName);
+        let lineUserId = "";
+        let lineDisplayName = "ผู้ใช้งาน LINE";
+        let pictureUrl = "";
+
+        // 1. ดึง User ID จาก getContext() (ดึงได้ทันทีในแอป LINE)
+        const context = liff.getContext();
+        if (context && context.userId) {
+          lineUserId = context.userId;
+        }
+
+        // 2. ดึง Profile จาก getProfile()
+        try {
+          const profile = await liff.getProfile();
+          if (profile) {
+            if (profile.userId) lineUserId = profile.userId;
+            if (profile.displayName) lineDisplayName = profile.displayName;
+            if (profile.pictureUrl) pictureUrl = profile.pictureUrl;
+          }
+        } catch (profErr) {
+          console.warn("getProfile failed, trying IDToken:", profErr);
+          try {
+            const idToken = liff.getDecodedIDToken();
+            if (idToken) {
+              if (idToken.sub) lineUserId = lineUserId || idToken.sub;
+              if (idToken.name) lineDisplayName = idToken.name;
+              if (idToken.picture) pictureUrl = idToken.picture;
+            }
+          } catch (tokenErr) {}
+        }
+
+        currentLineUserId = lineUserId;
+        if (pictureUrl) {
+          document.getElementById("liffUserImg").src = pictureUrl;
+        }
+        displayLine.innerText = lineDisplayName;
+        document.getElementById("lineUserId").value = currentLineUserId;
+        debugStatus.innerText = `UID: ${lineUserId ? lineUserId.substring(0, 10) + '...' : 'ไม่พบ'} | ใน LINE: ${liff.isInClient() ? 'ใช่' : 'ไม่ใช่'}`;
+
+        // ถ้าได้ User ID แล้ว ให้ค้นหา/แมปชื่อใน Sheet "Users"
+        if (lineUserId) {
+          displayEmp.innerText = "กำลังดึงข้อมูลพนักงาน...";
+          
+          if (typeof google !== "undefined" && google.script && google.script.run) {
+            google.script.run
+              .withSuccessHandler(handleProfileSuccess)
+              .withFailureHandler(handleProfileFallback)
+              .getEmployeeProfile(lineUserId, lineDisplayName, pictureUrl);
+          } else if (GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
+            // รองรับ GitHub Pages ผ่าน fetch GET API
+            const apiUrl = `${GAS_URL}?action=getEmployeeProfile&userId=${encodeURIComponent(lineUserId)}&name=${encodeURIComponent(lineDisplayName)}&pic=${encodeURIComponent(pictureUrl)}`;
+            fetch(apiUrl)
+              .then(res => res.json())
+              .then(handleProfileSuccess)
+              .catch(handleProfileFallback);
+          } else {
+            handleProfileFallback();
+          }
+        } else {
+          currentEmployeeName = lineDisplayName;
+          displayEmp.innerText = lineDisplayName;
+          empInput.value = lineDisplayName;
+        }
 
       } catch (err) {
-        log("❌ Error: " + err.message);
+        console.error("LIFF Init Error:", err);
+        displayEmp.innerText = "ผู้ใช้งานทั่วไป";
+        displayLine.innerText = "เปิดผ่านเบราว์เซอร์ภายนอก";
+        debugStatus.innerText = `ข้อผิดพลาด: ${err.message || 'LIFF Init Failed'}`;
+        empInput.value = "ผู้ใช้งานทั่วไป";
+        currentEmployeeName = "ผู้ใช้งานทั่วไป";
       }
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      const defaultId = document.getElementById("inputLiffId").value;
-      testLiff(defaultId);
-    });
+    function handleProfileSuccess(res) {
+      const displayEmp = document.getElementById("displayEmployeeName");
+      const empInput = document.getElementById("employeeName");
+      const debugStatus = document.getElementById("liffDebugStatus");
+
+      if (res && res.status === "success") {
+        currentEmployeeName = res.employeeName;
+        displayEmp.innerText = res.employeeName;
+        empInput.value = res.employeeName;
+        if (res.isMapped) {
+          document.getElementById("mappedBadge").classList.remove("hidden");
+        }
+        debugStatus.innerText = `✅ เชื่อมต่อ Sheet Users สำเร็จ`;
+      }
+    }
+
+    function handleProfileFallback(err) {
+      const displayEmp = document.getElementById("displayEmployeeName");
+      const empInput = document.getElementById("employeeName");
+      displayEmp.innerText = document.getElementById("lineDisplayNameText").innerText || "ผู้ใช้งาน LINE";
+      empInput.value = displayEmp.innerText;
+      currentEmployeeName = empInput.value;
+    }
+
+    /**
+     * 🛰️ ขอสิทธิ์และดึงตำแหน่ง GPS เบื้องหลัง
+     */
+    function initGPS(isManualClick) {
+      if (!navigator.geolocation) {
+        if (isManualClick) Swal.fire({ icon: 'error', title: 'อุปกรณ์ไม่รองรับ GPS', text: 'เบราว์เซอร์นี้ไม่รองรับระบบระบุตำแหน่ง' });
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          currentPosition = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy
+          };
+          document.getElementById("locationBlockedModal").classList.add("hidden");
+        },
+        (err) => {
+          console.warn("GPS Error:", err);
+          currentPosition = null;
+          if (isManualClick) {
+            document.getElementById("locationBlockedModal").classList.remove("hidden");
+          }
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+      );
+    }
+
+    /**
+     * ⏱️ เริ่มนับเวลาถอยหลัง 1.30 นาที (01:30 -> 00:00)
+     */
+    function startSessionTimeout() {
+      if (timerInterval) clearInterval(timerInterval);
+      remainingSeconds = 90;
+      updateTimerDisplay(); // แสดงผลตัวเลขทันที
+
+      timerInterval = setInterval(() => {
+        remainingSeconds--;
+        updateTimerDisplay();
+
+        if (remainingSeconds <= 0) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+          triggerTimeoutExpired();
+        }
+      }, 1000);
+    }
+
+    /**
+     * อัปเดตตัวเลขเวลานับถอยหลัง
+     */
+    function updateTimerDisplay() {
+      const display = document.getElementById("timerCountdownText");
+      if (!display) return;
+
+      const mins = Math.floor(remainingSeconds / 60);
+      const secs = remainingSeconds % 60;
+      const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      display.innerText = formatted;
+
+      if (remainingSeconds <= 20) {
+        display.className = "font-bold text-rose-500 tracking-wider animate-pulse";
+      } else {
+        display.className = "font-semibold text-slate-500 tracking-wider";
+      }
+    }
+
+    /**
+     * เมื่อหมดเวลา 1.30 นาที (แจ้งเตือน)
+     */
+    function triggerTimeoutExpired() {
+      stopLiveCamera();
+      currentPosition = null;
+
+      Swal.fire({
+        icon: 'warning',
+        title: 'หมดเวลาใช้งานระบบแล้ว',
+        html: 'กรุณากดปุ่มด้านล่าง เพื่อเริ่มใหม่',
+        confirmButtonText: 'คลิกเริ่มใหม่',
+        confirmButtonColor: '#2563eb',
+        allowOutsideClick: false,
+        allowEscapeKey: false
+      }).then((result) => {
+        if (result.isConfirmed) {
+          handleTimeoutRefresh();
+        }
+      });
+    }
+
+    /**
+     * รีเซ็ตฟอร์มเริ่มต้นใหม่ + ขอ GPS เบื้องหลัง
+     */
+    function handleTimeoutRefresh() {
+      const activeJobSelect = document.getElementById("activeJobSelect");
+      if (activeJobSelect) activeJobSelect.selectedIndex = 0;
+      document.getElementById("selectedJobInfoCard").classList.add("hidden");
+      document.getElementById("previewContainer").classList.add("hidden");
+      document.getElementById("previewImage").src = "";
+      base64Image = null;
+      document.getElementById("jobDetails").value = "";
+      currentPosition = null;
+
+      // ดึง GPS เบื้องหลัง (ไม่ต้องแสดง popup)
+      initGPS(false);
+      fetchActiveJobs(false);
+      startSessionTimeout();
+    }
+
+    function fetchActiveJobs(showToast) {
+      if (typeof google !== "undefined" && google.script && google.script.run && google.script.run.getActiveCheckIns) {
+        google.script.run
+          .withSuccessHandler((res) => {
+            if (res && res.status === "success" && res.data) {
+              activeJobsList = res.data;
+              populateActiveJobsDropdown();
+              if (showToast) {
+                Swal.fire({ icon: 'success', title: 'อัปเดตรายการงานสำเร็จ', timer: 1000, showConfirmButton: false });
+              }
+            }
+          })
+          .getActiveCheckIns();
+      }
+    }
+
+    function populateActiveJobsDropdown() {
+      const select = document.getElementById("activeJobSelect");
+      if (activeJobsList.length === 0) {
+        select.innerHTML = '<option value="" disabled selected>-- ไม่มีงานที่ Check-in ค้างอยู่ --</option>';
+        document.getElementById("selectedJobInfoCard").classList.add("hidden");
+        return;
+      }
+      let html = '<option value="" disabled selected>-- เลือกงานที่ต้องการ Check-out --</option>';
+      activeJobsList.forEach((job) => {
+        const shortDetail = job.checkInDetails.length > 25 ? job.checkInDetails.substring(0, 25) + "..." : job.checkInDetails;
+        html += `<option value="${job.jobId}">👤 ${job.employeeName} (${job.checkInTime}) - ${shortDetail}</option>`;
+      });
+      select.innerHTML = html;
+    }
+
+    function handleActiveJobChange() {
+      const select = document.getElementById("activeJobSelect");
+      const job = activeJobsList.find(j => j.jobId === select.value);
+      const infoCard = document.getElementById("selectedJobInfoCard");
+      if (job) {
+        document.getElementById("infoEmpName").innerText = job.employeeName;
+        document.getElementById("infoCheckInTime").innerText = job.checkInTime;
+        document.getElementById("infoJobDetails").innerText = job.checkInDetails || "-";
+        infoCard.classList.remove("hidden");
+      } else {
+        infoCard.classList.add("hidden");
+      }
+    }
+
+    function switchActionType(type) {
+      currentActionType = type;
+      if (type === "Check-out") fetchActiveJobs(false);
+      updateTheme();
+    }
+
+    function updateTheme() {
+      const isCheckIn = currentActionType === "Check-in";
+      const tabCheckIn = document.getElementById("tabCheckIn");
+      const tabCheckOut = document.getElementById("tabCheckOut");
+      const headerSection = document.getElementById("headerSection");
+      const headerTitle = document.getElementById("headerTitle");
+      const headerSubtitle = document.getElementById("headerSubtitle");
+      const headerIcon = document.getElementById("headerIcon");
+      const btnSubmit = document.getElementById("btnSubmit");
+      const btnSubmitText = document.getElementById("btnSubmitText");
+      
+      const empWrapper = document.getElementById("employeeNameWrapper");
+      const activeJobWrapper = document.getElementById("activeJobWrapper");
+      const photoLabel = document.getElementById("photoLabel");
+      const jobDetailsLabel = document.getElementById("jobDetailsLabel");
+      const jobDetailsTextarea = document.getElementById("jobDetails");
+
+      if (isCheckIn) {
+        tabCheckIn.className = "py-3 px-4 rounded-xl font-bold text-base flex items-center justify-center space-x-2 transition-all duration-300 bg-emerald-600 text-white shadow-md";
+        tabCheckOut.className = "py-3 px-4 rounded-xl font-bold text-base flex items-center justify-center space-x-2 transition-all duration-300 text-slate-600 hover:text-slate-900";
+        headerSection.className = "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-6 text-white text-center relative shadow-md theme-transition";
+        headerTitle.innerText = "Check-in เข้างาน";
+        headerSubtitle.innerText = "บันทึกเวลาเข้างาน พิกัด และรูปถ่าย";
+        headerSubtitle.className = "text-emerald-100 text-sm mt-1";
+        headerIcon.className = "fa-solid fa-business-time text-2xl text-white";
+        btnSubmit.className = "btn-touch w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-xl shadow-emerald-500/25 active:scale-[0.98] transition flex items-center justify-center space-x-2 text-lg theme-transition";
+        btnSubmitText.innerText = "ส่งงาน Check-in (เข้างาน)";
+
+        empWrapper.classList.remove("hidden");
+        activeJobWrapper.classList.add("hidden");
+        photoLabel.innerHTML = '<i class="fa-solid fa-camera text-slate-600 mr-1.5"></i> ภาพถ่ายสถานที่เข้างาน <span class="text-red-500">*</span>';
+        jobDetailsLabel.innerHTML = '<i class="fa-solid fa-clipboard-list text-slate-600 mr-1.5"></i> รายละเอียดของงาน (ตอนเข้างาน) <span class="text-red-500">*</span>';
+        jobDetailsTextarea.placeholder = "ระบุรายละเอียด เช่น งานตรวจเช็คระบบ, ส่งของลูกค้า, เริ่มงานไซท์ A...";
+      } else {
+        tabCheckIn.className = "py-3 px-4 rounded-xl font-bold text-base flex items-center justify-center space-x-2 transition-all duration-300 text-slate-600 hover:text-slate-900";
+        tabCheckOut.className = "py-3 px-4 rounded-xl font-bold text-base flex items-center justify-center space-x-2 transition-all duration-300 bg-rose-600 text-white shadow-md";
+        headerSection.className = "bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 p-6 text-white text-center relative shadow-md theme-transition";
+        headerTitle.innerText = "Check-out ออกงาน";
+        headerSubtitle.innerText = "เลือกงานที่ Check-in ไว้ และสรุปผลงาน";
+        headerSubtitle.className = "text-rose-100 text-sm mt-1";
+        headerIcon.className = "fa-solid fa-door-open text-2xl text-white";
+        btnSubmit.className = "btn-touch w-full bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-2xl shadow-xl shadow-rose-500/25 active:scale-[0.98] transition flex items-center justify-center space-x-2 text-lg theme-transition";
+        btnSubmitText.innerText = "ส่งงาน Check-out (ออกงาน)";
+
+        empWrapper.classList.add("hidden");
+        activeJobWrapper.classList.remove("hidden");
+        photoLabel.innerHTML = '<i class="fa-solid fa-camera text-slate-600 mr-1.5"></i> ภาพถ่ายสถานที่ตอนออกงาน <span class="text-red-500">*</span>';
+        jobDetailsLabel.innerHTML = '<i class="fa-solid fa-clipboard-check text-slate-600 mr-1.5"></i> สรุปผลการทำงาน (ตอนออกงาน) <span class="text-red-500">*</span>';
+        jobDetailsTextarea.placeholder = "ระบุผลงานที่ทำเสร็จ เช่น ตรวจเช็คระบบเรียบร้อย, ลูกค้ารับของแล้ว...";
+      }
+    }
+
+    async function startLiveCamera() {
+      const modal = document.getElementById("liveCameraModal");
+      const video = document.getElementById("cameraVideo");
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        document.getElementById("cameraInput").click();
+        return;
+      }
+
+      try {
+        if (videoStream) {
+          videoStream.getTracks().forEach(track => track.stop());
+        }
+
+        const constraints = {
+          video: {
+            facingMode: { ideal: currentFacingMode },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        };
+
+        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = videoStream;
+        await video.play();
+
+        modal.classList.remove("hidden");
+      } catch (err) {
+        document.getElementById("cameraInput").click();
+      }
+    }
+
+    function stopLiveCamera() {
+      const modal = document.getElementById("liveCameraModal");
+      const video = document.getElementById("cameraVideo");
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+      }
+      if (video) video.srcObject = null;
+      modal.classList.add("hidden");
+    }
+
+    function switchCameraFacing() {
+      currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+      startLiveCamera();
+    }
+
+    function takeSnapshot() {
+      const video = document.getElementById("cameraVideo");
+      const canvas = document.getElementById("captureCanvas");
+
+      if (!video || !video.videoWidth) return;
+
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext("2d");
+      if (currentFacingMode === "user") {
+        ctx.translate(width, 0);
+        ctx.scale(-1, 1);
+      }
+      
+      ctx.drawImage(video, 0, 0, width, height);
+
+      base64Image = canvas.toDataURL("image/jpeg", 0.8);
+      imageMimeType = "image/jpeg";
+
+      const previewImg = document.getElementById("previewImage");
+      previewImg.src = base64Image;
+      document.getElementById("previewContainer").classList.remove("hidden");
+
+      stopLiveCamera();
+    }
+
+    function handleImageSelected(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const maxDimension = 1200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDimension) { height = Math.round((height * maxDimension) / width); width = maxDimension; }
+          } else {
+            if (height > maxDimension) { width = Math.round((width * maxDimension) / height); height = maxDimension; }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+
+          base64Image = canvas.toDataURL("image/jpeg", 0.8);
+          imageMimeType = "image/jpeg";
+
+          const previewImg = document.getElementById("previewImage");
+          previewImg.src = base64Image;
+          document.getElementById("previewContainer").classList.remove("hidden");
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleSubmit() {
+      let employeeName = "";
+      let selectedJobId = "";
+
+      if (currentActionType === "Check-in") {
+        employeeName = document.getElementById("employeeName").value || currentEmployeeName;
+        if (!employeeName || employeeName === "กำลังเชื่อมต่อ LINE...") {
+          Swal.fire({
+            icon: 'warning',
+            title: 'กำลังเชื่อมต่อ LINE...',
+            text: 'กรุณารอสักครู่ให้ระบบระบุตัวตนจาก LINE หรือเปิดผ่าน LINE LIFF',
+            confirmButtonColor: '#059669',
+            confirmButtonText: 'เข้าใจแล้ว'
+          });
+          return;
+        }
+      } else {
+        const activeSelect = document.getElementById("activeJobSelect");
+        selectedJobId = activeSelect.value;
+        if (!selectedJobId) {
+          Swal.fire({
+            icon: 'warning',
+            title: 'กรุณาเลือกงานที่ต้องการ Check-out',
+            text: activeJobsList.length === 0 ? 'ขณะนี้ไม่มีงานที่ Check-in ค้างอยู่' : 'กรุณาเลือกรายการงานในดรอปดาวน์',
+            confirmButtonColor: '#e11d48',
+            confirmButtonText: 'เข้าใจแล้ว'
+          });
+          activeSelect.focus();
+          return;
+        }
+        const job = activeJobsList.find(j => j.jobId === selectedJobId);
+        if (job) employeeName = job.employeeName;
+      }
+
+      if (!base64Image) {
+        Swal.fire({
+          icon: 'warning',
+          title: `กรุณาถ่ายรูปเพื่อ ${currentActionType}`,
+          text: 'จำเป็นต้องถ่ายรูปสถานที่จริงก่อนส่งงาน',
+          confirmButtonColor: currentActionType === 'Check-in' ? '#059669' : '#e11d48',
+          confirmButtonText: 'เข้าใจแล้ว'
+        });
+        return;
+      }
+
+      const jobDetails = document.getElementById("jobDetails").value.trim();
+      if (!jobDetails) {
+        Swal.fire({
+          icon: 'warning',
+          title: currentActionType === 'Check-in' ? 'กรุณาระบุรายละเอียดงาน' : 'กรุณาระบุสรุปผลการทำงาน',
+          confirmButtonColor: currentActionType === 'Check-in' ? '#059669' : '#e11d48',
+          confirmButtonText: 'เข้าใจแล้ว'
+        });
+        document.getElementById("jobDetails").focus();
+        return;
+      }
+
+      // ถ้ายังไม่มีพิกัด GPS ให้พยายามดึงสดใหม่อีกครั้งทันทีก่อนส่ง
+      if (!currentPosition) {
+        Swal.fire({
+          title: 'กำลังดึงพิกัด GPS...',
+          text: 'กรุณารอสักครู่ ระบบกำลังระบุตำแหน่งปัจจุบันของคุณ',
+          allowOutsideClick: false,
+          didOpen: () => { Swal.showLoading(); }
+        });
+
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            currentPosition = {
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              accuracy: pos.coords.accuracy
+            };
+            Swal.close();
+            promptConfirmSubmit(employeeName, selectedJobId, jobDetails);
+          },
+          (err) => {
+            Swal.close();
+            document.getElementById("locationBlockedModal").classList.remove("hidden");
+          },
+          { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+        );
+        return;
+      }
+
+      promptConfirmSubmit(employeeName, selectedJobId, jobDetails);
+    }
+
+    function promptConfirmSubmit(employeeName, selectedJobId, jobDetails) {
+      const confirmBtnColor = currentActionType === 'Check-in' ? '#059669' : '#e11d48';
+
+      Swal.fire({
+        title: `ยืนยันการส่ง ${currentActionType}?`,
+        html: `
+          <div class="text-left text-sm space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-200 mt-2">
+            <p><b>ประเภท:</b> <span class="${currentActionType === 'Check-in' ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'}">${currentActionType}</span></p>
+            <p><b>พนักงาน:</b> ${employeeName}</p>
+            <p><b>รายละเอียด:</b> ${jobDetails}</p>
+          </div>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: confirmBtnColor,
+        cancelButtonColor: '#64748b',
+        confirmButtonText: `ยืนยันส่ง ${currentActionType}`,
+        cancelButtonText: 'ยกเลิก'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          sendDataToServer({
+            actionType: currentActionType,
+            employeeName: employeeName,
+            lineUserId: currentLineUserId,
+            jobId: selectedJobId,
+            jobDetails: jobDetails,
+            latitude: currentPosition.latitude,
+            longitude: currentPosition.longitude,
+            imageBase64: base64Image,
+            mimeType: imageMimeType
+          });
+        }
+      });
+    }
+
+    function sendDataToServer(payload) {
+      if (timerInterval) clearInterval(timerInterval);
+
+      Swal.fire({
+        title: 'กำลังบันทึกข้อมูล...',
+        html: 'ระบบกำลังระบุพิกัดล่าสุดและบันทึกข้อมูล<br><span class="text-xs text-slate-500">กรุณารอสักครู่...</span>',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+
+      const btnSubmit = document.getElementById("btnSubmit");
+      btnSubmit.disabled = true;
+      btnSubmit.classList.add("opacity-50");
+
+      // 🛰️ ดึงพิกัด GPS สดใหม่ ณ วินาทีที่กดส่ง (maximumAge: 0)
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            // ใช้พิกัดสดใหม่ล่าสุด
+            payload.latitude = pos.coords.latitude;
+            payload.longitude = pos.coords.longitude;
+            executeServerSubmit(payload, btnSubmit);
+          },
+          (err) => {
+            // หากดึงสดไม่สำเร็จ ให้ใช้พิกัดสำรองที่ดึงไว้ตอนเปิดเว็บ
+            console.warn("Real-time GPS failed, using fallback:", err);
+            executeServerSubmit(payload, btnSubmit);
+          },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+        );
+      } else {
+        executeServerSubmit(payload, btnSubmit);
+      }
+    }
+
+    function executeServerSubmit(payload, btnSubmit) {
+      const handleSubmitResult = (res) => {
+        btnSubmit.disabled = false;
+        btnSubmit.classList.remove("opacity-50");
+
+        if (res && res.status === "success") {
+          Swal.fire({
+            icon: 'success',
+            title: 'สำเร็จ!',
+            text: res.message || 'บันทึกข้อมูลเรียบร้อยแล้ว',
+            confirmButtonColor: currentActionType === 'Check-in' ? '#059669' : '#e11d48',
+            confirmButtonText: 'ตกลง'
+          }).then(() => {
+            document.getElementById("jobDetails").value = "";
+            document.getElementById("previewContainer").classList.add("hidden");
+            document.getElementById("previewImage").src = "";
+            document.getElementById("selectedJobInfoCard").classList.add("hidden");
+            base64Image = null;
+            fetchActiveJobs(false);
+            startSessionTimeout();
+          });
+        } else {
+          startSessionTimeout();
+          Swal.fire({
+            icon: 'error',
+            title: 'เกิดข้อผิดพลาด',
+            text: (res && res.message) ? res.message : 'ไม่สามารถบันทึกข้อมูลได้',
+            confirmButtonColor: '#2563eb'
+          });
+        }
+      };
+
+      const handleSubmitError = (err) => {
+        btnSubmit.disabled = false;
+        btnSubmit.classList.remove("opacity-50");
+        startSessionTimeout();
+        Swal.fire({
+          icon: 'error',
+          title: 'เชื่อมต่อล้มเหลว',
+          text: err.message || 'เกิดข้อผิดพลาดในการติดต่อกับ Server',
+          confirmButtonColor: '#2563eb'
+        });
+      };
+
+      if (typeof google !== "undefined" && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(handleSubmitResult)
+          .withFailureHandler(handleSubmitError)
+          .submitCheckIn(payload);
+      } else if (GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
+        fetch(GAS_URL, {
+          method: "POST",
+          body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(handleSubmitResult)
+        .catch(handleSubmitError);
+      } else {
+        handleSubmitError(new Error("ยังไม่ได้กำหนด URL ของ Google Apps Script ใน GAS_URL"));
+      }
+    }
   </script>
 </body>
 </html>
+
+
+
