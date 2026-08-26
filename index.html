@@ -267,9 +267,6 @@
 
     // ดึงข้อมูล Active Jobs ล่วงหน้า
     let preloadedActive = null;
-    try {
-      preloadedActive = <?!= initialActiveJobs ?>;
-    } catch (e) {}
 
     // เริ่มการทำงานทันทีที่เปิดหน้าเว็บ
     document.addEventListener("DOMContentLoaded", () => {
