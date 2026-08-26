@@ -2,103 +2,103 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>ระบบลงเวลาทำงาน Check-in / Check-out</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ทดสอบ LINE LIFF</title>
   
-  <!-- ⭐️ 1. ไอคอน Favicon สำหรับแท็บเบราว์เซอร์ -->
-  <link rel="icon" type="image/png" href="favicon.png">
-  <link rel="shortcut icon" type="image/png" href="favicon.png">
-
-  <!-- 📱 2. ไอคอนสำหรับเวลาบันทึกลงหน้าจอมือถือ (Add to Home Screen) -->
-  <link rel="apple-touch-icon" href="favicon.png">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    html, body {
-      width: 100%;
-      height: 100%;
-      height: 100dvh;
-      overflow: hidden;
-      background-color: #0f172a;
-    }
-    #appFrame {
-      width: 100%;
-      height: 100%;
-      height: 100dvh;
-      border: none;
-      display: block;
-    }
-    #loadingScreen {
-      position: fixed;
-      inset: 0;
-      background-color: #0f172a;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-family: system-ui, -apple-system, sans-serif;
-      z-index: 99;
-      transition: opacity 0.4s ease;
-    }
-    .spinner {
-      width: 44px;
-      height: 44px;
-      border: 4px solid rgba(255, 255, 255, 0.15);
-      border-top-color: #3b82f6;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-bottom: 16px;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- LINE LIFF SDK v2 -->
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
-<body>
+<body class="bg-slate-100 min-h-screen flex items-center justify-center p-4">
 
-  <!-- Loading Animation -->
-  <div id="loadingScreen">
-    <div class="spinner"></div>
-    <p style="font-size: 15px; font-weight: 500; letter-spacing: 0.5px;">กำลังเปิดระบบ...</p>
+  <div class="bg-white max-w-md w-full rounded-3xl p-6 shadow-xl text-center space-y-4">
+    
+    <div class="inline-flex p-3 bg-emerald-100 text-emerald-600 rounded-full text-2xl">
+      <i class="fa-brands fa-line text-3xl"></i>
+    </div>
+    
+    <h1 class="text-xl font-bold text-slate-800">ผลการเชื่อมต่อ LINE LIFF</h1>
+
+    <!-- รูปโปรไฟล์ -->
+    <div class="flex justify-center">
+      <img id="userImg" src="https://via.placeholder.com/100" alt="Profile" class="w-24 h-24 rounded-full border-4 border-emerald-400 shadow-md object-cover">
+    </div>
+
+    <!-- ข้อมูลโปรไฟล์ -->
+    <div class="space-y-2 text-left bg-slate-50 p-4 rounded-2xl border border-slate-200 text-sm">
+      <p><b>ชื่อ LINE:</b> <span id="displayName" class="text-emerald-600 font-semibold">กำลังโหลด...</span></p>
+      <p><b>User ID:</b> <span id="userId" class="text-slate-700 font-mono text-xs break-all">กำลังโหลด...</span></p>
+      <p><b>สถานะ:</b> <span id="isInClient" class="text-slate-600">-</span></p>
+    </div>
+
+    <!-- กล่อง Log -->
+    <div class="text-left bg-slate-900 text-emerald-400 p-3.5 rounded-xl font-mono text-xs space-y-1 h-36 overflow-y-auto" id="logBox">
+      <div>> เริ่มต้นระบบบน GitHub Pages...</div>
+    </div>
   </div>
 
-  <!-- iFrame รองรับ Camera & GPS -->
-  <iframe 
-    id="appFrame" 
-    src=""
-    allow="geolocation *; camera *; microphone *; clipboard-write *"
-    allowfullscreen
-    onload="hideLoading()">
-  </iframe>
-
   <script>
-    // ⚙️ ใส่ URL Web App ของคุณที่ได้จากการ Deploy Google Apps Script (/exec)
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbxIadAegPme3e6ESzN9GsmTZbrUILtOyajVTcXcEFNaC_HnxCli1Uls5juL8s7KrS3t/exec";
+    // 🟢 1. ใส่ LIFF ID ของคุณ
+    const LIFF_ID = "2011269941-XE0w8aRR"; 
 
-    // ส่งต่อ Query Parameter จาก URL เช่น ?fn=dashbord หรือ ?openExternalBrowser=1 เข้า iFrame
-    const currentParams = window.location.search;
-    const finalUrl = GAS_URL + currentParams;
+    // 🟢 2. ใส่ Google Apps Script Web App URL ของคุณ
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxIadAegPme3e6ESzN9GsmTZbrUILtOyajVTcXcEFNaC_HnxCli1Uls5juL8s7KrS3t/exec"; 
 
-    const frame = document.getElementById("appFrame");
-    frame.src = finalUrl;
+    function addLog(msg) {
+      const box = document.getElementById("logBox");
+      box.innerHTML += `<div>> ${msg}</div>`;
+      box.scrollTop = box.scrollHeight;
+    }
 
-    function hideLoading() {
-      const loader = document.getElementById("loadingScreen");
-      if (loader) {
-        loader.style.opacity = "0";
-        setTimeout(() => {
-          loader.style.display = "none";
-        }, 400);
+    async function initLiff() {
+      addLog("กำลังเริ่ม liff.init()...");
+      try {
+        await liff.init({ liffId: LIFF_ID });
+        addLog("✅ liff.init() สำเร็จ 100%!");
+
+        const inClient = liff.isInClient();
+        document.getElementById("isInClient").innerText = inClient ? "ในแอป LINE ✅" : "เบราว์เซอร์ภายนอก 🌐";
+
+        if (!inClient && !liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+
+        const profile = await liff.getProfile();
+        document.getElementById("displayName").innerText = profile.displayName;
+        document.getElementById("userId").innerText = profile.userId;
+        if (profile.pictureUrl) {
+          document.getElementById("userImg").src = profile.pictureUrl;
+        }
+        addLog("✅ ได้รับ User ID: " + profile.userId);
+        addLog("✅ ได้รับชื่อ: " + profile.displayName);
+
+        // ส่งข้อมูลไปบันทึกลง Google Sheet
+        addLog("กำลังส่งเข้า Google Sheet...");
+        fetch(GAS_URL, {
+          method: "POST",
+          body: JSON.stringify({
+            userId: profile.userId,
+            displayName: profile.displayName,
+            pictureUrl: profile.pictureUrl || "-"
+          })
+        })
+        .then(res => res.json())
+        .then(data => {
+          addLog("🎉 " + data.message);
+        })
+        .catch(err => {
+          addLog("⚠️ บันทึกเข้า Sheet: " + err.message);
+        });
+
+      } catch (err) {
+        addLog("❌ Error: " + err.message);
       }
     }
+
+    document.addEventListener("DOMContentLoaded", initLiff);
   </script>
 </body>
 </html>
