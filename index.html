@@ -296,9 +296,49 @@
       const debugStatus = document.getElementById("liffDebugStatus");
       const empInput = document.getElementById("employeeName");
 
+      let hasLocalCache = false;
+
+      // 1. เช็ค LocalStorage ก่อน หากมีข้อมูลผู้ใช้แล้ว ให้แสดงผลทันทีแบบรวดเร็วที่สุด (0.01 วินาที)
+      const cached = localStorage.getItem("liff_user_cache");
+      if (cached) {
+        try {
+          const u = JSON.parse(cached);
+          if (u && u.userId && u.displayName) {
+            hasLocalCache = true;
+            currentLineUserId = u.userId;
+            currentEmployeeName = u.displayName;
+            displayEmp.innerText = u.displayName;
+            displayLine.innerText = u.displayName;
+            empInput.value = u.displayName;
+            document.getElementById("lineUserId").value = u.userId;
+            if (u.pictureUrl) {
+              document.getElementById("liffUserImg").src = u.pictureUrl;
+            }
+            debugStatus.innerText = `⚡ โหลดจาก Cache ความเร็วสูง`;
+          }
+        } catch (e) {}
+      }
+
+      // 2. หากยังไม่มีข้อมูลใน Cache (ใช้งานครั้งแรก) ให้ขึ้น Popup โลโก้โหลด "กำลังเชื่อมต่อระบบ..."
+      if (!hasLocalCache) {
+        Swal.fire({
+          title: 'กำลังเชื่อมต่อระบบ...',
+          html: `
+            <div class="py-3 flex flex-col items-center">
+              <i class="fa-solid fa-circle-notch fa-spin text-emerald-600 text-4xl mb-3"></i>
+              <p class="text-sm text-slate-600">กำลังดึงข้อมูลและลงทะเบียนเข้าใช้งาน...</p>
+            </div>
+          `,
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          showConfirmButton: false
+        });
+      }
+
       try {
         let activeLiffId = (typeof liffId !== "undefined" ? liffId : "").trim();
         if (!activeLiffId || activeLiffId.includes("YOUR_LIFF_ID_HERE")) {
+          if (!hasLocalCache) Swal.close();
           displayEmp.innerText = "ยังไม่ได้ใส่ LIFF ID";
           displayLine.innerText = "ใส่ LIFF ID ในโค้ด";
           debugStatus.innerText = "สถานะ: รอตั้งค่า LIFF ID";
@@ -308,6 +348,7 @@
         }
 
         if (typeof liff === "undefined") {
+          if (!hasLocalCache) Swal.close();
           displayEmp.innerText = "ไม่ได้โหลด LIFF SDK";
           displayLine.innerText = "เปิดผ่านเบราว์เซอร์ทั่วไป";
           debugStatus.innerText = "สถานะ: เบราว์เซอร์ทั่วไป";
@@ -316,10 +357,10 @@
           return;
         }
 
-        // เริ่มต้นเชื่อมต่อ LINE LIFF (ตั้ง Timeout 3 วินาที ป้องกันหน้าเว็บค้าง)
+        // เริ่มต้นเชื่อมต่อ LINE LIFF (ตั้ง Timeout 4 วินาที)
         const initPromise = liff.init({ liffId: activeLiffId });
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("LIFF_TIMEOUT")), 3000)
+          setTimeout(() => reject(new Error("LIFF_TIMEOUT")), 4000)
         );
 
         await Promise.race([initPromise, timeoutPromise]);
@@ -333,13 +374,10 @@
         let lineDisplayName = "ผู้ใช้งาน LINE";
         let pictureUrl = "";
 
-        // 1. ดึง User ID จาก getContext() (ดึงได้ทันทีในแอป LINE)
+        // ดึง User ID และ Profile
         const context = liff.getContext();
-        if (context && context.userId) {
-          lineUserId = context.userId;
-        }
+        if (context && context.userId) lineUserId = context.userId;
 
-        // 2. ดึง Profile จาก getProfile()
         try {
           const profile = await liff.getProfile();
           if (profile) {
@@ -348,7 +386,6 @@
             if (profile.pictureUrl) pictureUrl = profile.pictureUrl;
           }
         } catch (profErr) {
-          console.warn("getProfile failed, trying IDToken:", profErr);
           try {
             const idToken = liff.getDecodedIDToken();
             if (idToken) {
@@ -360,53 +397,57 @@
         }
 
         currentLineUserId = lineUserId;
-        if (pictureUrl) {
-          document.getElementById("liffUserImg").src = pictureUrl;
-        }
+        if (pictureUrl) document.getElementById("liffUserImg").src = pictureUrl;
         displayLine.innerText = lineDisplayName;
         document.getElementById("lineUserId").value = currentLineUserId;
-        debugStatus.innerText = `UID: ${lineUserId ? lineUserId.substring(0, 10) + '...' : 'ไม่พบ'} | ใน LINE: ${liff.isInClient() ? 'ใช่' : 'ไม่ใช่'}`;
 
-        // ถ้าได้ User ID แล้ว ให้ค้นหา/แมปชื่อใน Sheet "Users"
-        if (lineUserId) {
-          displayEmp.innerText = "กำลังดึงข้อมูลพนักงาน...";
-          
-          if (typeof google !== "undefined" && google.script && google.script.run) {
-            google.script.run
-              .withSuccessHandler(handleProfileSuccess)
-              .withFailureHandler(handleProfileFallback)
-              .getEmployeeProfile(lineUserId, lineDisplayName, pictureUrl);
-          } else if (GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
-            // รองรับ GitHub Pages ผ่าน fetch POST API
-            fetch(GAS_URL, {
-              method: "POST",
-              headers: { "Content-Type": "text/plain;charset=utf-8" },
-              body: JSON.stringify({
-                action: "getEmployeeProfile",
-                userId: lineUserId,
-                displayName: lineDisplayName,
-                pictureUrl: pictureUrl
-              })
+        // แสดง LINE Display Name เป็นหลัก
+        displayEmp.innerText = lineDisplayName;
+        empInput.value = lineDisplayName;
+        currentEmployeeName = lineDisplayName;
+
+        // บันทึกใส่ LocalStorage เก็บไว้สำหรับครั้งถัดไป
+        localStorage.setItem("liff_user_cache", JSON.stringify({
+          userId: lineUserId,
+          displayName: lineDisplayName,
+          pictureUrl: pictureUrl
+        }));
+
+        // ส่งไปสร้าง/อัปเดตข้อมูลใน Sheet "Users"
+        if (lineUserId && GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
+          fetch(GAS_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({
+              action: "getEmployeeProfile",
+              userId: lineUserId,
+              displayName: lineDisplayName,
+              pictureUrl: pictureUrl
             })
-              .then(res => res.json())
-              .then(handleProfileSuccess)
-              .catch(handleProfileFallback);
-          } else {
-            handleProfileFallback();
-          }
+          })
+          .then(res => res.json())
+          .then(res => {
+            if (!hasLocalCache) Swal.close();
+            if (res && res.status === "success") {
+              debugStatus.innerText = `✅ ลงทะเบียน Sheet Users สำเร็จ`;
+            }
+          })
+          .catch(err => {
+            if (!hasLocalCache) Swal.close();
+          });
         } else {
-          currentEmployeeName = lineDisplayName;
-          displayEmp.innerText = lineDisplayName;
-          empInput.value = lineDisplayName;
+          if (!hasLocalCache) Swal.close();
         }
 
       } catch (err) {
         console.error("LIFF Init Error:", err);
-        displayEmp.innerText = "ผู้ใช้งานทั่วไป";
-        displayLine.innerText = "เปิดผ่านเบราว์เซอร์ภายนอก";
-        debugStatus.innerText = `ข้อผิดพลาด: ${err.message || 'LIFF Init Failed'}`;
-        empInput.value = "ผู้ใช้งานทั่วไป";
-        currentEmployeeName = "ผู้ใช้งานทั่วไป";
+        if (!hasLocalCache) Swal.close();
+        if (!hasLocalCache) {
+          displayEmp.innerText = "ผู้ใช้งานทั่วไป";
+          displayLine.innerText = "เปิดผ่านเบราว์เซอร์ภายนอก";
+          empInput.value = "ผู้ใช้งานทั่วไป";
+          currentEmployeeName = "ผู้ใช้งานทั่วไป";
+        }
       }
     }
 
@@ -544,18 +585,34 @@
     }
 
     function fetchActiveJobs(showToast) {
+      const handleActiveSuccess = (res) => {
+        if (res && res.status === "success" && Array.isArray(res.data)) {
+          activeJobsList = res.data;
+          populateActiveJobsDropdown();
+          if (showToast) {
+            Swal.fire({ icon: 'success', title: 'อัปเดตรายการงานสำเร็จ', timer: 1000, showConfirmButton: false });
+          }
+        } else {
+          populateActiveJobsDropdown();
+        }
+      };
+
       if (typeof google !== "undefined" && google.script && google.script.run && google.script.run.getActiveCheckIns) {
         google.script.run
-          .withSuccessHandler((res) => {
-            if (res && res.status === "success" && res.data) {
-              activeJobsList = res.data;
-              populateActiveJobsDropdown();
-              if (showToast) {
-                Swal.fire({ icon: 'success', title: 'อัปเดตรายการงานสำเร็จ', timer: 1000, showConfirmButton: false });
-              }
-            }
-          })
+          .withSuccessHandler(handleActiveSuccess)
           .getActiveCheckIns();
+      } else if (GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
+        fetch(GAS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "getActiveCheckIns" })
+        })
+          .then(res => res.json())
+          .then(handleActiveSuccess)
+          .catch(err => {
+            console.warn("fetchActiveJobs error:", err);
+            populateActiveJobsDropdown();
+          });
       }
     }
 
