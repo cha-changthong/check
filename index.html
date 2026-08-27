@@ -320,6 +320,7 @@
               document.getElementById("liffUserImg").src = u.pictureUrl;
             }
             debugStatus.innerText = `เชื่อมต่อแล้ว`;
+            fetchActiveJobs(false);
           }
         } catch (e) {}
       }
@@ -405,6 +406,9 @@
         if (pictureUrl) document.getElementById("liffUserImg").src = pictureUrl;
         displayLine.innerText = lineDisplayName;
         document.getElementById("lineUserId").value = currentLineUserId;
+
+        // ดึงรายการงานค้างเฉพาะของ LINE User ID นี้ทันที
+        if (currentLineUserId) fetchActiveJobs(false);
 
         // ส่งไปสร้าง/อัปเดตข้อมูลใน Sheet "Users" และดึงชื่อแมปจริง
         if (lineUserId && GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
@@ -868,8 +872,8 @@
       // ถ้ายังไม่มีพิกัด GPS ให้พยายามดึงสดใหม่อีกครั้งทันทีก่อนส่ง
       if (!currentPosition) {
         Swal.fire({
-          title: 'กำลังดึงข้อมูล...',
-          text: 'กรุณารอสักครู่ ระบบกำลังทำงาน',
+          title: 'กำลังดึงพิกัด GPS...',
+          text: 'กรุณารอสักครู่ ระบบกำลังระบุตำแหน่งปัจจุบันของคุณ',
           allowOutsideClick: false,
           didOpen: () => { Swal.showLoading(); }
         });
