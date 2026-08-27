@@ -78,7 +78,7 @@
         <i id="headerIcon" class="fa-solid fa-business-time text-2xl text-white"></i>
       </div>
       <h1 id="headerTitle" class="text-2xl font-bold tracking-wide">Check-in เข้างาน</h1>
-      <p id="headerSubtitle" class="text-emerald-100 text-sm mt-1">บันทึกเวลาทำงาน พิกัด และรูปถ่าย</p>
+      <p id="headerSubtitle" class="text-emerald-100 text-sm mt-1">บันทึกเวลาทำงานและรูปถ่ายสถานที่</p>
     </div>
 
     <!-- Form Body -->
@@ -255,8 +255,8 @@
     let activeJobsList = [];
 
     // 🌐 ตั้งค่า URL สำหรับ GitHub Pages และ LINE LIFF
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbxIadAegPme3e6ESzN9GsmTZbrUILtOyajVTcXcEFNaC_HnxCli1Uls5juL8s7KrS3t/exec"; // นำ Web App URL ของ Apps Script มาใส่ที่นี่
-    let liffId = "2011269941-XEOw8aRR"; // LIFF ID ที่ถูกต้อง
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxIadAegPme3e6ESzN9GsmTZbrUILtOyajVTcXcEFNaC_HnxCli1Uls5juL8s7KrS3t/exec";
+    let liffId = "2011269941-XEOw8aRR";
 
     let currentLineUserId = "";
     let currentEmployeeName = "";
@@ -923,7 +923,7 @@
 
       Swal.fire({
         title: 'กำลังบันทึกข้อมูล...',
-        html: 'ระบบกำลังระบุพิกัดล่าสุดและบันทึกข้อมูล<br><span class="text-xs text-slate-500">กรุณารอสักครู่...</span>',
+        html: 'กำลังส่งข้อมูลเข้าสู่ระบบ<br><span class="text-xs text-slate-500">กรุณารอสักครู่...</span>',
         allowOutsideClick: false,
         didOpen: () => { Swal.showLoading(); }
       });
