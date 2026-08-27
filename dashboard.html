@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Dashboard ประวัติการ Check-in / Check-out</title>
+  
+  <!-- Google Fonts: Prompt -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <style>
+    * { font-family: 'Prompt', sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background: linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 100%); min-height: 100vh; }
+    .input-filter { min-height: 48px; font-size: 0.95rem; }
+    .btn-touch { min-height: 48px; font-size: 1rem; }
+  </style>
+</head>
+<body class="p-3 sm:p-6 flex justify-center items-start">
+
+  <div class="w-full max-w-4xl bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 mb-10">
+    
+    <!-- Top Header -->
+    <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-5 sm:p-6 text-white shadow-md">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shadow-inner">
+            <i class="fa-solid fa-chart-line text-blue-400"></i>
+          </div>
+          <div>
+            <h1 class="text-xl sm:text-2xl font-bold">Dashboard ลงเวลา</h1>
+            <p class="text-slate-300 text-xs sm:text-sm">ประวัติการ Check-in และ Check-out</p>
+          </div>
+        </div>
+        <button onclick="fetchDashboardData()" class="inline-flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-500 text-white font-medium px-3.5 py-2.5 rounded-xl text-xs sm:text-sm shadow-md transition active:scale-95">
+          <i class="fa-solid fa-rotate"></i>
+          <span>โหลดใหม่</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter Control Panel -->
+    <div class="p-4 sm:p-6 bg-slate-50 border-b border-slate-200 space-y-4">
+      <div class="flex items-center justify-between">
+        <span class="font-bold text-slate-800 text-sm sm:text-base flex items-center">
+          <i class="fa-solid fa-filter text-blue-600 mr-2 text-base"></i> ค้นหาและกรองข้อมูลงาน
+        </span>
+        <button onclick="resetFilters()" class="text-xs sm:text-sm text-blue-600 hover:text-blue-800 font-semibold flex items-center bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl transition">
+          <i class="fa-solid fa-rotate mr-1.5"></i> ล้างค่า
+        </button>
+      </div>
+
+      <!-- แถวที่ 1: ค้นหาพนักงาน & สถานะงาน -->
+      <div class="grid grid-cols-2 gap-2.5 sm:gap-3">
+        <div>
+          <label class="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
+            <i class="fa-solid fa-user text-slate-500 mr-1"></i> พนักงาน
+          </label>
+          <input type="text" id="filterEmployee" onkeyup="applyFilters()" placeholder="พิมพ์ชื่อพนักงาน..." class="input-filter w-full px-3 rounded-2xl border-2 border-slate-200 bg-white text-slate-800 font-medium outline-none focus:border-blue-500 text-sm sm:text-base">
+        </div>
+
+        <div>
+          <label class="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
+            <i class="fa-solid fa-tag text-slate-500 mr-1"></i> สถานะงาน
+          </label>
+          <div class="relative">
+            <select id="filterStatus" onchange="applyFilters()" class="input-filter w-full pl-3 pr-7 rounded-2xl border-2 border-slate-200 bg-white text-slate-800 font-medium outline-none focus:border-blue-500 text-sm sm:text-base appearance-none truncate transition">
+              <option value="ALL">ทั้งหมด (ทุกสถานะ)</option>
+              <option value="กำลังทำงาน">🟢 กำลังทำงาน</option>
+              <option value="เสร็จสิ้น">🔵 เสร็จสิ้น</option>
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+              <i class="fa-solid fa-chevron-down text-xs sm:text-sm"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- แถวที่ 2: วันที่เริ่มต้น - วันที่สิ้นสุด -->
+      <div class="grid grid-cols-2 gap-2.5 sm:gap-3">
+        <div>
+          <label class="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
+            <i class="fa-solid fa-calendar-day text-slate-500 mr-1"></i> วันที่เริ่ม (Check-in)
+          </label>
+          <input type="date" id="filterStartDate" onchange="applyFilters()" class="input-filter w-full px-3 rounded-2xl border-2 border-slate-200 bg-white text-slate-800 font-medium outline-none focus:border-blue-500 text-sm sm:text-base">
+        </div>
+
+        <div>
+          <label class="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
+            <i class="fa-solid fa-calendar-check text-slate-500 mr-1"></i> ถึงวันที่
+          </label>
+          <input type="date" id="filterEndDate" onchange="applyFilters()" class="input-filter w-full px-3 rounded-2xl border-2 border-slate-200 bg-white text-slate-800 font-medium outline-none focus:border-blue-500 text-sm sm:text-base">
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Stats Bar -->
+    <div class="p-4 sm:p-6 bg-white border-b border-slate-100">
+      <div class="grid grid-cols-3 gap-2.5 sm:gap-4">
+        <div onclick="setFilterStatusQuick('ALL')" class="p-3 sm:p-4 rounded-2xl bg-slate-50 border border-slate-200/80 cursor-pointer hover:bg-slate-100 transition text-center shadow-sm">
+          <p class="text-[11px] sm:text-xs font-semibold text-slate-500">📊 งานทั้งหมด</p>
+          <p id="statTotalCount" class="text-xl sm:text-3xl font-bold text-slate-800 mt-0.5">0</p>
+        </div>
+        <div onclick="setFilterStatusQuick('กำลังทำงาน')" class="p-3 sm:p-4 rounded-2xl bg-emerald-50 border border-emerald-200/80 cursor-pointer hover:bg-emerald-100 transition text-center shadow-sm">
+          <p class="text-[11px] sm:text-xs font-semibold text-emerald-600">🟢 กำลังทำงาน</p>
+          <p id="statActiveCount" class="text-xl sm:text-3xl font-bold text-emerald-700 mt-0.5">0</p>
+        </div>
+        <div onclick="setFilterStatusQuick('เสร็จสิ้น')" class="p-3 sm:p-4 rounded-2xl bg-blue-50 border border-blue-200/80 cursor-pointer hover:bg-blue-100 transition text-center shadow-sm">
+          <p class="text-[11px] sm:text-xs font-semibold text-blue-600">🔵 เสร็จสิ้น</p>
+          <p id="statCompletedCount" class="text-xl sm:text-3xl font-bold text-blue-700 mt-0.5">0</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main List View Section -->
+    <div class="p-4 sm:p-6 min-h-[300px]">
+      <div id="loadingSpinner" class="flex flex-col items-center justify-center py-12 text-slate-400 space-y-3">
+        <i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-600"></i>
+        <p class="text-sm font-medium">กำลังโหลดข้อมูลประวัติการทำงาน...</p>
+      </div>
+
+      <div id="noDataState" class="hidden flex flex-col items-center justify-center py-12 text-slate-400 space-y-2">
+        <i class="fa-solid fa-folder-open text-4xl text-slate-300"></i>
+        <p class="text-sm font-medium text-slate-500">ไม่พบรายการงานที่ตรงกับเงื่อนไขการค้นหา</p>
+      </div>
+
+      <div id="recordsContainer" class="space-y-3"></div>
+    </div>
+  </div>
+
+  <!-- Detailed Modal Popup -->
+  <div id="detailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col my-auto">
+      
+      <!-- Modal Header -->
+      <div class="p-4 sm:p-5 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex items-center justify-between flex-shrink-0">
+        <div>
+          <span id="modalStatusBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500 text-white">กำลังทำงาน</span>
+          <h3 id="modalEmployeeTitle" class="text-lg font-bold mt-1">พนักงาน: -</h3>
+          <p id="modalJobId" class="text-xs text-slate-400 font-mono">JOB-00000000-0000</p>
+        </div>
+        <button onclick="closeDetailModal()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white text-lg transition active:scale-95">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-4 sm:p-5 overflow-y-auto space-y-4 text-sm flex-1">
+        <!-- Work Duration Tag -->
+        <div id="modalDurationBox" class="p-3 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-between">
+          <span class="font-semibold text-indigo-900 text-xs sm:text-sm">⏱️ ระยะเวลาทำงานรวม</span>
+          <span id="modalDurationText" class="font-bold text-indigo-700 text-sm sm:text-base">-</span>
+        </div>
+
+        <!-- 1. Check-in Section -->
+        <div class="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-100 space-y-2">
+          <div class="flex items-center justify-between border-b border-emerald-200/60 pb-2">
+            <span class="font-bold text-emerald-800 flex items-center text-sm sm:text-base">
+              <i class="fa-solid fa-right-to-bracket text-emerald-600 mr-2"></i> ข้อมูลเข้างาน (Check-in)
+            </span>
+            <span id="modalCheckInTime" class="text-xs font-semibold text-emerald-700">-</span>
+          </div>
+
+          <div>
+            <p class="text-xs font-medium text-slate-500">รายละเอียดงานเข้า:</p>
+            <p id="modalCheckInDetails" class="text-slate-800 font-medium bg-white p-2.5 rounded-xl border border-emerald-100 text-xs sm:text-sm mt-1 whitespace-pre-line">-</p>
+          </div>
+
+          <div id="modalCheckInImgWrap" class="hidden">
+            <p class="text-xs font-medium text-slate-500 mb-1">รูปถ่ายสถานที่เข้างาน:</p>
+            <img id="modalCheckInImg" src="" alt="Check-in Photo" class="w-full h-48 object-cover rounded-xl border border-emerald-200 shadow-sm">
+          </div>
+
+          <div class="flex items-center space-x-2 pt-1">
+            <a id="modalCheckInMapBtn" href="#" target="_blank" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition">
+              <i class="fa-solid fa-map-location-dot mr-1.5"></i> แผนที่ Google Maps
+            </a>
+            <a id="modalCheckInDriveBtn" href="#" target="_blank" class="flex-1 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition">
+              <i class="fa-brands fa-google-drive mr-1.5 text-emerald-600"></i> ดูรูปใน Drive
+            </a>
+          </div>
+        </div>
+
+        <!-- 2. Check-out Section -->
+        <div id="modalCheckOutBox" class="p-3.5 rounded-2xl bg-rose-50/70 border border-rose-100 space-y-2">
+          <div class="flex items-center justify-between border-b border-rose-200/60 pb-2">
+            <span class="font-bold text-rose-800 flex items-center text-sm sm:text-base">
+              <i class="fa-solid fa-right-from-bracket text-rose-600 mr-2"></i> ข้อมูลออกงาน (Check-out)
+            </span>
+            <span id="modalCheckOutTime" class="text-xs font-semibold text-rose-700">-</span>
+          </div>
+
+          <div>
+            <p class="text-xs font-medium text-slate-500">สรุปผลการทำงานออก:</p>
+            <p id="modalCheckOutDetails" class="text-slate-800 font-medium bg-white p-2.5 rounded-xl border border-rose-100 text-xs sm:text-sm mt-1 whitespace-pre-line">-</p>
+          </div>
+
+          <div id="modalCheckOutImgWrap" class="hidden">
+            <p class="text-xs font-medium text-slate-500 mb-1">รูปถ่ายสถานที่ออกงาน:</p>
+            <img id="modalCheckOutImg" src="" alt="Check-out Photo" class="w-full h-48 object-cover rounded-xl border border-rose-200 shadow-sm">
+          </div>
+
+          <div class="flex items-center space-x-2 pt-1">
+            <a id="modalCheckOutMapBtn" href="#" target="_blank" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition">
+              <i class="fa-solid fa-map-location-dot mr-1.5"></i> แผนที่ Google Maps
+            </a>
+            <a id="modalCheckOutDriveBtn" href="#" target="_blank" class="flex-1 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition">
+              <i class="fa-brands fa-google-drive mr-1.5 text-rose-600"></i> ดูรูปใน Drive
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 🌐 นำ Web App URL ของ Google Apps Script มาวางตรงนี้
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxIadAegPme3e6ESzN9GsmTZbrUILtOyajVTcXcEFNaC_HnxCli1Uls5juL8s7KrS3t/exec";
+
+    let allRecords = [];
+    let filteredRecords = [];
+
+    document.addEventListener("DOMContentLoaded", () => {
+      fetchDashboardData();
+    });
+
+    function fetchDashboardData() {
+      document.getElementById("loadingSpinner").classList.remove("hidden");
+      document.getElementById("noDataState").classList.add("hidden");
+      document.getElementById("recordsContainer").innerHTML = "";
+
+      if (!GAS_URL || GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
+        showError("กรุณาใส่ Web App URL ของ Apps Script ในไฟล์ dashboard.html");
+        document.getElementById("loadingSpinner").classList.add("hidden");
+        return;
+      }
+
+      fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "getDashboardData" })
+      })
+      .then(res => res.json())
+      .then(res => {
+        document.getElementById("loadingSpinner").classList.add("hidden");
+        if (res && res.status === "success" && Array.isArray(res.data)) {
+          allRecords = res.data;
+          applyFilters();
+        } else {
+          showError(res.message || "ไม่สามารถดึงข้อมูลประวัติได้");
+        }
+      })
+      .catch(err => {
+        document.getElementById("loadingSpinner").classList.add("hidden");
+        showError("เชื่อมต่อล้มเหลว: " + err.message);
+      });
+    }
+
+    function setFilterStatusQuick(status) {
+      document.getElementById("filterStatus").value = status;
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const empSearch = document.getElementById("filterEmployee").value.trim().toLowerCase();
+      const statusFilter = document.getElementById("filterStatus").value;
+      const startDateVal = document.getElementById("filterStartDate").value;
+      const endDateVal = document.getElementById("filterEndDate").value;
+
+      filteredRecords = allRecords.filter(item => {
+        // 1. กรองพนักงาน (ค้นหาบางคำ)
+        if (empSearch && !item.employeeName.toLowerCase().includes(empSearch)) {
+          return false;
+        }
+
+        // 2. กรองสถานะงาน
+        if (statusFilter !== "ALL" && item.status !== statusFilter) {
+          return false;
+        }
+
+        // 3. กรองวันที่ Check-in
+        if (startDateVal || endDateVal) {
+          const itemDate = parseDateFromStr(item.checkInTime);
+          if (itemDate) {
+            if (startDateVal) {
+              const startD = new Date(startDateVal + "T00:00:00");
+              if (itemDate < startD) return false;
+            }
+            if (endDateVal) {
+              const endD = new Date(endDateVal + "T23:59:59");
+              if (itemDate > endD) return false;
+            }
+          }
+        }
+
+        return true;
+      });
+
+      updateStatsCounters();
+      renderRecordsList();
+    }
+
+    function parseDateFromStr(str) {
+      if (!str || str === "-") return null;
+      const parts = str.split(" ");
+      if (parts.length < 1) return null;
+      const dateParts = parts[0].split("/");
+      if (dateParts.length < 3) return null;
+      return new Date(parseInt(dateParts[2], 10), parseInt(dateParts[1], 10) - 1, parseInt(dateParts[0], 10));
+    }
+
+    function updateStatsCounters() {
+      const total = filteredRecords.length;
+      const active = filteredRecords.filter(r => r.status === "กำลังทำงาน").length;
+      const completed = filteredRecords.filter(r => r.status === "เสร็จสิ้น").length;
+
+      document.getElementById("statTotalCount").innerText = total;
+      document.getElementById("statActiveCount").innerText = active;
+      document.getElementById("statCompletedCount").innerText = completed;
+    }
+
+    function renderRecordsList() {
+      const container = document.getElementById("recordsContainer");
+      const noDataState = document.getElementById("noDataState");
+
+      if (filteredRecords.length === 0) {
+        container.innerHTML = "";
+        noDataState.classList.remove("hidden");
+        return;
+      }
+
+      noDataState.classList.add("hidden");
+      let html = "";
+
+      filteredRecords.forEach((item, index) => {
+        const isCompleted = item.status === "เสร็จสิ้น";
+        const checkInThumb = getDriveThumbnailUrl(item.checkInPhoto, item.checkInFileId);
+        const checkOutThumb = getDriveThumbnailUrl(item.checkOutPhoto, item.checkOutFileId);
+
+        html += `
+          <div onclick="openDetailModal(${index})" class="p-3.5 sm:p-4 bg-white rounded-2xl border border-slate-200/80 hover:border-blue-400 hover:shadow-md cursor-pointer transition flex items-center justify-between space-x-3">
+            
+            <div class="flex-1 min-w-0 space-y-1">
+              <div class="flex items-center space-x-2">
+                <span class="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold ${isCompleted ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}">
+                  ${isCompleted ? '🔵 เสร็จสิ้น' : '🟢 กำลังทำงาน'}
+                </span>
+                <span class="font-bold text-slate-800 text-sm sm:text-base truncate">${item.employeeName}</span>
+              </div>
+
+              <p class="text-xs text-slate-500 truncate">
+                <i class="fa-solid fa-clock text-slate-400 mr-1"></i> เข้า: ${item.checkInTime}
+                ${isCompleted ? ` | ออก: ${item.checkOutTime}` : ''}
+              </p>
+
+              <p class="text-xs text-slate-600 truncate font-medium bg-slate-50 px-2 py-1 rounded-lg">
+                📝 ${item.checkInDetails}
+              </p>
+            </div>
+
+            <div class="flex flex-col items-end space-y-2 flex-shrink-0">
+              <div class="flex items-center space-x-1.5">
+                <div class="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center relative shadow-sm">
+                  ${checkInThumb ? `<img src="${checkInThumb}" class="w-full h-full object-cover">` : `<i class="fa-solid fa-image text-slate-300 text-xs"></i>`}
+                  <span class="absolute bottom-0 right-0 bg-emerald-600 text-white text-[8px] px-1 font-bold rounded-tl">เข้า</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center relative shadow-sm">
+                  ${checkOutThumb ? `<img src="${checkOutThumb}" class="w-full h-full object-cover">` : `<i class="fa-solid fa-image text-slate-300 text-xs"></i>`}
+                  <span class="absolute bottom-0 right-0 ${isCompleted ? 'bg-rose-600' : 'bg-slate-400'} text-white text-[8px] px-1 font-bold rounded-tl">ออก</span>
+                </div>
+              </div>
+              <span class="text-xs font-bold text-blue-600 flex items-center">
+                ดูรายละเอียด <i class="fa-solid fa-chevron-right ml-1 text-[10px]"></i>
+              </span>
+            </div>
+
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function getDriveThumbnailUrl(url, fileId) {
+      if (!url || url === "-") return "";
+      if (url.startsWith("http") && (url.includes("placeholder") || url.includes("data:image"))) return url;
+      let id = fileId;
+      if (!id && url.includes("/d/")) {
+        const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) id = match[1];
+      }
+      if (!id && url.includes("id=")) {
+        const match = url.match(/id=([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) id = match[1];
+      }
+      return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w400` : url;
+    }
+
+    function openDetailModal(index) {
+      const item = filteredRecords[index];
+      if (!item) return;
+
+      const isCompleted = item.status === "เสร็จสิ้น";
+
+      document.getElementById("modalJobId").innerText = item.jobId;
+      document.getElementById("modalEmployeeTitle").innerText = `พนักงาน: ${item.employeeName}`;
+      
+      const statusBadge = document.getElementById("modalStatusBadge");
+      if (isCompleted) {
+        statusBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500 text-white";
+        statusBadge.innerText = "เสร็จสิ้น";
+      } else {
+        statusBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500 text-white";
+        statusBadge.innerText = "กำลังทำงาน";
+      }
+
+      const durationText = document.getElementById("modalDurationText");
+      if (isCompleted && item.workDuration !== "-") {
+        durationText.innerText = item.workDuration;
+      } else {
+        durationText.innerText = "กำลังปฏิบัติงานอยู่ (ยังไม่ Check-out)";
+      }
+
+      document.getElementById("modalCheckInTime").innerText = item.checkInTime;
+      document.getElementById("modalCheckInDetails").innerText = item.checkInDetails || "-";
+
+      const checkInImg = document.getElementById("modalCheckInImg");
+      const checkInSrc = getDriveThumbnailUrl(item.checkInPhoto, item.checkInFileId);
+      if (checkInSrc) {
+        checkInImg.src = checkInSrc;
+        document.getElementById("modalCheckInImgWrap").classList.remove("hidden");
+      } else {
+        document.getElementById("modalCheckInImgWrap").classList.add("hidden");
+      }
+
+      const checkInMapBtn = document.getElementById("modalCheckInMapBtn");
+      if (item.checkInMapsUrl && item.checkInMapsUrl !== "-") {
+        checkInMapBtn.href = item.checkInMapsUrl;
+        checkInMapBtn.classList.remove("hidden");
+      } else {
+        checkInMapBtn.classList.add("hidden");
+      }
+
+      const checkInDriveBtn = document.getElementById("modalCheckInDriveBtn");
+      if (item.checkInPhoto && item.checkInPhoto !== "-") {
+        checkInDriveBtn.href = item.checkInPhoto;
+        checkInDriveBtn.classList.remove("hidden");
+      } else {
+        checkInDriveBtn.classList.add("hidden");
+      }
+
+      const checkOutTime = document.getElementById("modalCheckOutTime");
+      const checkOutDetails = document.getElementById("modalCheckOutDetails");
+      const checkOutImg = document.getElementById("modalCheckOutImg");
+      const checkOutImgWrap = document.getElementById("modalCheckOutImgWrap");
+      const checkOutMapBtn = document.getElementById("modalCheckOutMapBtn");
+      const checkOutDriveBtn = document.getElementById("modalCheckOutDriveBtn");
+
+      if (isCompleted) {
+        checkOutTime.innerText = item.checkOutTime;
+        checkOutDetails.innerText = item.checkOutDetails || "-";
+
+        const checkOutSrc = getDriveThumbnailUrl(item.checkOutPhoto, item.checkOutFileId);
+        if (checkOutSrc) {
+          checkOutImg.src = checkOutSrc;
+          checkOutImgWrap.classList.remove("hidden");
+        } else {
+          checkOutImgWrap.classList.add("hidden");
+        }
+
+        if (item.checkOutMapsUrl && item.checkOutMapsUrl !== "-") {
+          checkOutMapBtn.href = item.checkOutMapsUrl;
+          checkOutMapBtn.classList.remove("hidden");
+        } else {
+          checkOutMapBtn.classList.add("hidden");
+        }
+
+        if (item.checkOutPhoto && item.checkOutPhoto !== "-") {
+          checkOutDriveBtn.href = item.checkOutPhoto;
+          checkOutDriveBtn.classList.remove("hidden");
+        } else {
+          checkOutDriveBtn.classList.add("hidden");
+        }
+      } else {
+        checkOutTime.innerText = "ยังไม่ได้ Check-out";
+        checkOutDetails.innerText = "- อยู่ระหว่างปฏิบัติงาน -";
+        checkOutImgWrap.classList.add("hidden");
+        checkOutMapBtn.classList.add("hidden");
+        checkOutDriveBtn.classList.add("hidden");
+      }
+
+      document.getElementById("detailModal").classList.remove("hidden");
+    }
+
+    function closeDetailModal() {
+      document.getElementById("detailModal").classList.add("hidden");
+    }
+
+    function resetFilters() {
+      document.getElementById("filterEmployee").value = "";
+      document.getElementById("filterStatus").value = "ALL";
+      document.getElementById("filterStartDate").value = "";
+      document.getElementById("filterEndDate").value = "";
+      applyFilters();
+    }
+
+    function showError(msg) {
+      Swal.fire({
+        icon: 'error',
+        title: 'แจ้งเตือน',
+        text: msg,
+        confirmButtonColor: '#2563eb'
+      });
+    }
+  </script>
+</body>
+</html>
