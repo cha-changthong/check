@@ -306,15 +306,20 @@
           if (u && u.userId && u.displayName) {
             hasLocalCache = true;
             currentLineUserId = u.userId;
-            currentEmployeeName = u.displayName;
-            displayEmp.innerText = u.displayName;
+            currentEmployeeName = u.employeeName || u.displayName;
+            displayEmp.innerText = currentEmployeeName;
             displayLine.innerText = u.displayName;
-            empInput.value = u.displayName;
+            empInput.value = currentEmployeeName;
+            if (u.isMapped) {
+              document.getElementById("mappedBadge").classList.remove("hidden");
+            } else {
+              document.getElementById("mappedBadge").classList.add("hidden");
+            }
             document.getElementById("lineUserId").value = u.userId;
             if (u.pictureUrl) {
               document.getElementById("liffUserImg").src = u.pictureUrl;
             }
-            debugStatus.innerText = `⚡ โหลดจาก Cache ความเร็วสูง`;
+            debugStatus.innerText = `เชื่อมต่อแล้ว`;
           }
         } catch (e) {}
       }
@@ -401,19 +406,7 @@
         displayLine.innerText = lineDisplayName;
         document.getElementById("lineUserId").value = currentLineUserId;
 
-        // แสดง LINE Display Name เป็นหลัก
-        displayEmp.innerText = lineDisplayName;
-        empInput.value = lineDisplayName;
-        currentEmployeeName = lineDisplayName;
-
-        // บันทึกใส่ LocalStorage เก็บไว้สำหรับครั้งถัดไป
-        localStorage.setItem("liff_user_cache", JSON.stringify({
-          userId: lineUserId,
-          displayName: lineDisplayName,
-          pictureUrl: pictureUrl
-        }));
-
-        // ส่งไปสร้าง/อัปเดตข้อมูลใน Sheet "Users"
+        // ส่งไปสร้าง/อัปเดตข้อมูลใน Sheet "Users" และดึงชื่อแมปจริง
         if (lineUserId && GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
           fetch(GAS_URL, {
             method: "POST",
@@ -428,15 +421,35 @@
           .then(res => res.json())
           .then(res => {
             if (!hasLocalCache) Swal.close();
-            if (res && res.status === "success") {
-              debugStatus.innerText = `✅ ลงทะเบียน Sheet Users สำเร็จ`;
+            if (res && res.status === "success" && res.employeeName) {
+              currentEmployeeName = res.employeeName;
+              displayEmp.innerText = res.employeeName;
+              empInput.value = res.employeeName;
+              if (res.isMapped) {
+                document.getElementById("mappedBadge").classList.remove("hidden");
+              } else {
+                document.getElementById("mappedBadge").classList.add("hidden");
+              }
+
+              // บันทึกใส่ LocalStorage เก็บไว้สำหรับครั้งถัดไป
+              localStorage.setItem("liff_user_cache", JSON.stringify({
+                userId: lineUserId,
+                displayName: lineDisplayName,
+                employeeName: res.employeeName,
+                isMapped: res.isMapped,
+                pictureUrl: pictureUrl
+              }));
+
+              debugStatus.innerText = `เชื่อมต่อแล้ว`;
             }
           })
           .catch(err => {
             if (!hasLocalCache) Swal.close();
+            debugStatus.innerText = `เชื่อมต่อแล้ว`;
           });
         } else {
           if (!hasLocalCache) Swal.close();
+          debugStatus.innerText = `เชื่อมต่อแล้ว`;
         }
 
       } catch (err) {
@@ -605,7 +618,7 @@
         fetch(GAS_URL, {
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action: "getActiveCheckIns" })
+          body: JSON.stringify({ action: "getActiveCheckIns", lineUserId: currentLineUserId })
         })
           .then(res => res.json())
           .then(handleActiveSuccess)
@@ -855,8 +868,8 @@
       // ถ้ายังไม่มีพิกัด GPS ให้พยายามดึงสดใหม่อีกครั้งทันทีก่อนส่ง
       if (!currentPosition) {
         Swal.fire({
-          title: 'กำลังดึงพิกัด GPS...',
-          text: 'กรุณารอสักครู่ ระบบกำลังระบุตำแหน่งปัจจุบันของคุณ',
+          title: 'กำลังดึงข้อมูล...',
+          text: 'กรุณารอสักครู่ ระบบกำลังทำงาน',
           allowOutsideClick: false,
           didOpen: () => { Swal.showLoading(); }
         });
