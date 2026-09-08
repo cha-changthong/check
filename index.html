@@ -244,7 +244,11 @@
     </div>
   </div>
 
-  <script>
+
+
+
+
+    <script>
     let currentActionType = "Check-in";
     let currentPosition = null;
     let base64Image = null;
@@ -265,24 +269,10 @@
     let timerInterval = null;
     let remainingSeconds = 90;
 
-    // ดึงข้อมูล Active Jobs ล่วงหน้า
-    let preloadedActive = null;
-
     // เริ่มการทำงานทันทีที่เปิดหน้าเว็บ
     document.addEventListener("DOMContentLoaded", () => {
-      // 1. เชื่อมต่อ LINE LIFF เพื่อดึง User ID
       initLineLiff();
-      
-      // 2. ขอสิทธิ์ GPS ทันทีที่เปิดหน้าเว็บ (ทำงานเบื้องหลัง)
       initGPS(false);
-
-      if (preloadedActive && preloadedActive.status === "success" && Array.isArray(preloadedActive.data)) {
-        activeJobsList = preloadedActive.data;
-        populateActiveJobsDropdown();
-      } else {
-        fetchActiveJobs(false);
-      }
-
       updateTheme();
       startSessionTimeout();
     });
@@ -468,38 +458,11 @@
       }
     }
 
-    function handleProfileSuccess(res) {
-      const displayEmp = document.getElementById("displayEmployeeName");
-      const empInput = document.getElementById("employeeName");
-      const debugStatus = document.getElementById("liffDebugStatus");
-
-      if (res && res.status === "success") {
-        currentEmployeeName = res.employeeName;
-        displayEmp.innerText = res.employeeName;
-        empInput.value = res.employeeName;
-        if (res.isMapped) {
-          document.getElementById("mappedBadge").classList.remove("hidden");
-        }
-        debugStatus.innerText = `✅ เชื่อมต่อ Sheet Users สำเร็จ`;
-      }
-    }
-
-    function handleProfileFallback(err) {
-      const displayEmp = document.getElementById("displayEmployeeName");
-      const empInput = document.getElementById("employeeName");
-      displayEmp.innerText = document.getElementById("lineDisplayNameText").innerText || "ผู้ใช้งาน LINE";
-      empInput.value = displayEmp.innerText;
-      currentEmployeeName = empInput.value;
-    }
-
     /**
      * 🛰️ ขอสิทธิ์และดึงตำแหน่ง GPS เบื้องหลัง
      */
     function initGPS(isManualClick) {
-      if (!navigator.geolocation) {
-        if (isManualClick) Swal.fire({ icon: 'error', title: 'อุปกรณ์ไม่รองรับ GPS', text: 'เบราว์เซอร์นี้ไม่รองรับระบบระบุตำแหน่ง' });
-        return;
-      }
+      if (!navigator.geolocation) return;
 
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -512,12 +475,8 @@
         },
         (err) => {
           console.warn("GPS Error:", err);
-          currentPosition = null;
-          if (isManualClick) {
-            document.getElementById("locationBlockedModal").classList.remove("hidden");
-          }
         },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
       );
     }
 
@@ -527,7 +486,7 @@
     function startSessionTimeout() {
       if (timerInterval) clearInterval(timerInterval);
       remainingSeconds = 90;
-      updateTimerDisplay(); // แสดงผลตัวเลขทันที
+      updateTimerDisplay();
 
       timerInterval = setInterval(() => {
         remainingSeconds--;
@@ -541,9 +500,6 @@
       }, 1000);
     }
 
-    /**
-     * อัปเดตตัวเลขเวลานับถอยหลัง
-     */
     function updateTimerDisplay() {
       const display = document.getElementById("timerCountdownText");
       if (!display) return;
@@ -560,9 +516,6 @@
       }
     }
 
-    /**
-     * เมื่อหมดเวลา 1.30 นาที (แจ้งเตือน)
-     */
     function triggerTimeoutExpired() {
       stopLiveCamera();
       currentPosition = null;
@@ -582,9 +535,6 @@
       });
     }
 
-    /**
-     * รีเซ็ตฟอร์มเริ่มต้นใหม่ + ขอ GPS เบื้องหลัง
-     */
     function handleTimeoutRefresh() {
       const activeJobSelect = document.getElementById("activeJobSelect");
       if (activeJobSelect) activeJobSelect.selectedIndex = 0;
@@ -595,7 +545,6 @@
       document.getElementById("jobDetails").value = "";
       currentPosition = null;
 
-      // ดึง GPS เบื้องหลัง (ไม่ต้องแสดง popup)
       initGPS(false);
       fetchActiveJobs(false);
       startSessionTimeout();
@@ -786,8 +735,8 @@
 
       if (!video || !video.videoWidth) return;
 
-      // ปรับขนาดภาพความกว้างสูงสุด 960px เพื่อให้ไฟล์มีขนาดเล็ก (ประมาณ 100-150KB) บันทึกเร็วมากใน 1 วินาที
-      const maxWidth = 960;
+      // 📸 บีบอัดรูปถ่ายความกว้าง 720px คุณภาพ 0.55 (ขนาดไฟล์ ~40-60KB บันทึกไวขึ้น 2 เท่า)
+      const maxWidth = 720;
       let targetWidth = video.videoWidth;
       let targetHeight = video.videoHeight;
 
@@ -801,9 +750,8 @@
       const ctx = canvas.getContext("2d");
       ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
 
-      // บีบอัดรูปเป็น JPEG คุณภาพ 0.65 (ขนาดเล็กลง 85% ส่งเข้า Drive ได้ใน 1 วินาที)
       imageMimeType = "image/jpeg";
-      base64Image = canvas.toDataURL("image/jpeg", 0.65);
+      base64Image = canvas.toDataURL("image/jpeg", 0.55);
 
       const previewImage = document.getElementById("previewImage");
       previewImage.src = base64Image;
@@ -869,34 +817,6 @@
         return;
       }
 
-      // ถ้ายังไม่มีพิกัด GPS ให้พยายามดึงสดใหม่อีกครั้งทันทีก่อนส่ง
-      if (!currentPosition) {
-        Swal.fire({
-          title: 'กำลังดึงพิกัด GPS...',
-          text: 'กรุณารอสักครู่ ระบบกำลังระบุตำแหน่งปัจจุบันของคุณ',
-          allowOutsideClick: false,
-          didOpen: () => { Swal.showLoading(); }
-        });
-
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            currentPosition = {
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-              accuracy: pos.coords.accuracy
-            };
-            Swal.close();
-            promptConfirmSubmit(employeeName, selectedJobId, jobDetails);
-          },
-          (err) => {
-            Swal.close();
-            document.getElementById("locationBlockedModal").classList.remove("hidden");
-          },
-          { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
-        );
-        return;
-      }
-
       promptConfirmSubmit(employeeName, selectedJobId, jobDetails);
     }
 
@@ -926,8 +846,8 @@
             lineUserId: currentLineUserId,
             jobId: selectedJobId,
             jobDetails: jobDetails,
-            latitude: currentPosition.latitude,
-            longitude: currentPosition.longitude,
+            latitude: currentPosition ? currentPosition.latitude : 0,
+            longitude: currentPosition ? currentPosition.longitude : 0,
             imageBase64: base64Image,
             mimeType: imageMimeType
           });
@@ -949,21 +869,19 @@
       btnSubmit.disabled = true;
       btnSubmit.classList.add("opacity-50");
 
-      // 🛰️ ดึงพิกัด GPS สดใหม่ ณ วินาทีที่กดส่ง (maximumAge: 0)
+      // 🛰️ ดึงพิกัด GPS สดใหม่ (ตั้งเวลาแค่ 2.5 วินาที ไม่ค้างรอนาน 8 วินาทีอีกต่อไป)
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            // ใช้พิกัดสดใหม่ล่าสุด
             payload.latitude = pos.coords.latitude;
             payload.longitude = pos.coords.longitude;
             executeServerSubmit(payload, btnSubmit);
           },
           (err) => {
-            // หากดึงสดไม่สำเร็จ ให้ใช้พิกัดสำรองที่ดึงไว้ตอนเปิดเว็บ
-            console.warn("Real-time GPS failed, using fallback:", err);
+            console.warn("Real-time GPS fallback:", err);
             executeServerSubmit(payload, btnSubmit);
           },
-          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+          { enableHighAccuracy: true, timeout: 2500, maximumAge: 60000 }
         );
       } else {
         executeServerSubmit(payload, btnSubmit);
@@ -1033,6 +951,12 @@
       }
     }
   </script>
+
+
+
+
+
+  
 </body>
 </html>
 
