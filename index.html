@@ -121,8 +121,8 @@
             <i class="fa-solid fa-clipboard-check text-rose-600 mr-1.5"></i> เลือกงานที่ Check-in ค้างอยู่ <span class="text-red-500">*</span>
           </label>
           <button type="button" onclick="fetchActiveJobs(true)" class="text-xs text-rose-600 hover:text-rose-800 font-medium flex items-center bg-rose-50 px-2.5 py-1 rounded-lg">
-            <i class="fa-solid fa-rotate mr-1"></i> โหลดใหม่
-          </button>
+            <i id="reloadActiveIcon" class="fa-solid fa-rotate mr-1"></i> โหลดใหม่
+            </button>
         </div>
         <div class="relative">
           <select id="activeJobSelect" onchange="handleActiveJobChange()" class="input-touch w-full px-4 rounded-2xl border-2 border-rose-200 focus:border-rose-500 focus:ring-4 focus:ring-rose-100 outline-none text-slate-800 bg-rose-50/50 font-medium transition cursor-pointer appearance-none truncate">
@@ -550,8 +550,15 @@
       startSessionTimeout();
     }
 
-    function fetchActiveJobs(showToast) {
+        function fetchActiveJobs(showToast) {
+      // 🔄 เริ่มหมุนไอคอนโหลดใหม่
+      const reloadIcon = document.getElementById("reloadActiveIcon");
+      if (reloadIcon) reloadIcon.classList.add("fa-spin");
+
       const handleActiveSuccess = (res) => {
+        // 🛑 ปิดไอคอนหมุนเมื่อโหลดเสร็จ
+        if (reloadIcon) reloadIcon.classList.remove("fa-spin");
+        
         if (res && res.status === "success" && Array.isArray(res.data)) {
           activeJobsList = res.data;
           populateActiveJobsDropdown();
@@ -566,6 +573,10 @@
       if (typeof google !== "undefined" && google.script && google.script.run && google.script.run.getActiveCheckIns) {
         google.script.run
           .withSuccessHandler(handleActiveSuccess)
+          .withFailureHandler(() => {
+            if (reloadIcon) reloadIcon.classList.remove("fa-spin");
+            populateActiveJobsDropdown();
+          })
           .getActiveCheckIns();
       } else if (GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
         fetch(GAS_URL, {
@@ -577,8 +588,11 @@
           .then(handleActiveSuccess)
           .catch(err => {
             console.warn("fetchActiveJobs error:", err);
+            if (reloadIcon) reloadIcon.classList.remove("fa-spin");
             populateActiveJobsDropdown();
           });
+      } else {
+        if (reloadIcon) reloadIcon.classList.remove("fa-spin");
       }
     }
 
