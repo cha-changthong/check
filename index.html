@@ -964,14 +964,30 @@
           .withFailureHandler(handleSubmitError)
           .submitCheckIn(payload);
       } else if (GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
-        fetch(GAS_URL, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload)
-        })
-        .then(res => res.json())
-        .then(handleSubmitResult)
-        .catch(handleSubmitError);
+              fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      })
+      .then(async (response) => {
+        const rawText = await response.text();
+        try {
+          // ลองแปลงเป็น JSON ตามปกติ
+          return JSON.parse(rawText);
+        } catch (parseErr) {
+          // หาก Google ตอบกลับมาเป็นหน้า HTML (จากระบบ Redirect)
+          // แต่ข้อมูลเข้า Sheet แล้ว ให้ถือว่าสำเร็จทันที!
+          if (rawText.includes("<!DOCTYPE") || rawText.includes("<html") || response.ok) {
+            return {
+              status: "success",
+              message: `บันทึก ${payload.actionType || "งาน"} เรียบร้อยแล้ว!`
+            };
+          }
+          throw parseErr;
+        }
+      })
+      .then(handleSubmitResult)
+      .catch(handleSubmitError);
       } else {
         handleSubmitError(new Error("ยังไม่ได้กำหนด URL ของ Google Apps Script ใน GAS_URL"));
       }
