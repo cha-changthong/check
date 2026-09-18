@@ -578,13 +578,24 @@
             populateActiveJobsDropdown();
           })
           .getActiveCheckIns();
-      } else if (GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
+            } else if (GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
         fetch(GAS_URL, {
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action: "getActiveCheckIns", lineUserId: currentLineUserId })
+          body: JSON.stringify({ 
+            action: "getActiveCheckIns", 
+            employeeName: currentEmployeeName,
+            lineUserId: currentLineUserId 
+          })
         })
-          .then(res => res.json())
+          .then(async (res) => {
+            const raw = await res.text();
+            try {
+              return JSON.parse(raw);
+            } catch (e) {
+              return { status: "error", data: [] };
+            }
+          })
           .then(handleActiveSuccess)
           .catch(err => {
             console.warn("fetchActiveJobs error:", err);
