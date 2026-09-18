@@ -187,11 +187,11 @@
           <span id="btnSubmitText">ส่งงาน Check-in (เข้างาน)</span>
         </button>
 
-        <!-- ⏱️ Live Countdown Timer (1.30 นาที: 01:30) -->
+        <!-- ⏱️ Live Countdown Timer  -->
         <div class="flex items-center justify-center space-x-1.5 mt-2.5 text-xs text-slate-400 select-none">
           <i class="fa-regular fa-clock text-[11px]"></i>
           <span>หมดเวลาใน:</span>
-          <span id="timerCountdownText" class="font-semibold text-slate-500 tracking-wider">01:30</span>
+          <span id="timerCountdownText" class="font-semibold text-slate-500 tracking-wider">03:00</span>
         </div>
       </div>
 
@@ -265,9 +265,9 @@
     let currentLineUserId = "";
     let currentEmployeeName = "";
 
-    // ⏱️ ตัวแปรนับเวลาถอยหลัง 1.30 นาที (90 วินาที)
+    // ⏱️ ตัวแปรนับเวลาถอยหลัง 3.00 นาที (180 วินาที)
     let timerInterval = null;
-    let remainingSeconds = 90;
+    let remainingSeconds = 180;
 
     // เริ่มการทำงานทันทีที่เปิดหน้าเว็บ
     document.addEventListener("DOMContentLoaded", () => {
@@ -481,11 +481,11 @@
     }
 
     /**
-     * ⏱️ เริ่มนับเวลาถอยหลัง 1.30 นาที (01:30 -> 00:00)
+     * ⏱️ เริ่มนับเวลาถอยหลัง 3.00 นาที (3.00 -> 00:00)
      */
     function startSessionTimeout() {
       if (timerInterval) clearInterval(timerInterval);
-      remainingSeconds = 90;
+      remainingSeconds = 180;
       updateTimerDisplay();
 
       timerInterval = setInterval(() => {
@@ -883,23 +883,35 @@
       btnSubmit.disabled = true;
       btnSubmit.classList.add("opacity-50");
 
-      // 🛰️ ดึงพิกัด GPS สดใหม่ (ตั้งเวลาแค่ 2.5 วินาที ไม่ค้างรอนาน 8 วินาทีอีกต่อไป)
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            payload.latitude = pos.coords.latitude;
-            payload.longitude = pos.coords.longitude;
-            executeServerSubmit(payload, btnSubmit);
-          },
-          (err) => {
-            console.warn("Real-time GPS fallback:", err);
-            executeServerSubmit(payload, btnSubmit);
-          },
-          { enableHighAccuracy: true, timeout: 2500, maximumAge: 60000 }
-        );
-      } else {
-        executeServerSubmit(payload, btnSubmit);
-      }
+          // 🛰️ จังหวะที่ 2: ถ้ามีพิกัดจากการเปิดหน้าเว็บอยู่แล้ว ให้ใช้ส่งทันที 0 วิ! ไม่ต้องดึงใหม่
+    if (currentPosition && currentPosition.latitude && currentPosition.longitude) {
+      payload.latitude = currentPosition.latitude;
+      payload.longitude = currentPosition.longitude;
+      executeServerSubmit(payload, btnSubmit);
+      return;
+    }
+
+    // ถ้ายังไม่มีพิกัด (เช่น เพิ่งเปิดแอปแล้วรีบกดส่งทันที) ให้แอบดึงเบื้องหลังเงียบๆ แล้วส่งข้อมูล
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          currentPosition = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude
+          };
+          payload.latitude = pos.coords.latitude;
+          payload.longitude = pos.coords.longitude;
+          executeServerSubmit(payload, btnSubmit);
+        },
+        (err) => {
+          console.warn("Silent GPS fallback:", err);
+          executeServerSubmit(payload, btnSubmit);
+        },
+        { enableHighAccuracy: true, timeout: 6000, maximumAge: 120000 }
+      );
+    } else {
+      executeServerSubmit(payload, btnSubmit);
+    }
     }
 
     function executeServerSubmit(payload, btnSubmit) {
