@@ -122,7 +122,7 @@
           </label>
           <button type="button" onclick="fetchActiveJobs(true)" class="text-xs text-rose-600 hover:text-rose-800 font-medium flex items-center bg-rose-50 px-2.5 py-1 rounded-lg">
             <i id="reloadActiveIcon" class="fa-solid fa-rotate mr-1"></i> โหลดใหม่
-            </button>
+          </button>
         </div>
         <div class="relative">
           <select id="activeJobSelect" onchange="handleActiveJobChange()" class="input-touch w-full px-4 rounded-2xl border-2 border-rose-200 focus:border-rose-500 focus:ring-4 focus:ring-rose-100 outline-none text-slate-800 bg-rose-50/50 font-medium transition cursor-pointer appearance-none truncate">
@@ -225,30 +225,7 @@
     </div>
   </div>
 
-  <!-- Fullscreen Modal when Location is Blocked -->
-  <div id="locationBlockedModal" class="hidden fixed inset-0 z-50 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl space-y-4">
-      <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-3xl shadow-inner">
-        <i class="fa-solid fa-location-dot"></i>
-      </div>
-      <h2 class="text-xl font-bold text-slate-800">จำเป็นต้องเปิด GPS</h2>
-      <p class="text-slate-600 text-sm leading-relaxed">
-        ระบบต้องการสิทธิ์เข้าถึงตำแหน่ง (GPS) เพื่อบันทึกพิกัดทำงาน กรุณากดปุ่มด้านล่างเพื่ออนุญาตสิทธิ์
-      </p>
-      <div class="pt-2 space-y-2">
-        <button onclick="initGPS(true)" class="btn-touch w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg active:scale-95 transition">
-          <i class="fa-solid fa-location-arrow mr-1.5"></i> อนุญาตและดึงพิกัดใหม่
-        </button>
-        <p class="text-xs text-slate-400">หากกดยกเลิกไปแล้ว ให้ไปที่การตั้งค่าสิทธิ์เบราว์เซอร์เพื่อเปิดตำแหน่ง</p>
-      </div>
-    </div>
-  </div>
-
-
-
-
-
-    <script>
+  <script>
     let currentActionType = "Check-in";
     let currentPosition = null;
     let base64Image = null;
@@ -271,11 +248,81 @@
 
     // เริ่มการทำงานทันทีที่เปิดหน้าเว็บ
     document.addEventListener("DOMContentLoaded", () => {
-      initLineLiff();
-      initGPS(false);
       updateTheme();
-      startSessionTimeout();
+      initApp();
     });
+
+    /**
+     * 🚀 ตรวจความพร้อมของระบบ: ดึงพิกัด GPS และเชื่อมต่อ LINE LIFF ตั้งแต่เปิดเว็บ
+     */
+    async function initApp() {
+      Swal.fire({
+        title: 'กำลังเปิดระบบ รอสักครู่...',
+        html: `
+          <div class="py-4 flex flex-col items-center">
+            <i class="fa-solid fa-circle-notch fa-spin text-emerald-600 text-5xl mb-3"></i>
+            <p class="text-sm font-semibold text-slate-700">กำลังระบุพิกัด GPS และเชื่อมต่อระบบ...</p>
+            <p class="text-xs text-slate-400 mt-1">กรุณารอสักครู่ ห้ามปิดหน้านี้</p>
+          </div>
+        `,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false
+      });
+
+      const liffTask = initLineLiff();
+
+      const gpsTask = new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("อุปกรณ์ไม่รองรับระบบ GPS"));
+          return;
+        }
+
+        const onGpsSuccess = (pos) => {
+          currentPosition = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy
+          };
+          resolve(currentPosition);
+        };
+
+        // ชั้นที่ 1: ดึงแบบแม่นยำสูง (ดาวเทียม)
+        navigator.geolocation.getCurrentPosition(
+          onGpsSuccess,
+          () => {
+            // ชั้นที่ 2: ถ้าดาวเทียมไม่ติด (อยู่ในตึก/อาคาร) ให้สลับใช้ Wi-Fi/เสาสัญญาณทันที
+            navigator.geolocation.getCurrentPosition(
+              onGpsSuccess,
+              (err) => reject(err),
+              { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
+            );
+          },
+          { enableHighAccuracy: true, timeout: 4000, maximumAge: 300000 }
+        );
+      });
+
+      try {
+        await Promise.all([gpsTask, liffTask]);
+        Swal.close();
+        startSessionTimeout();
+      } catch (err) {
+        console.warn("Init GPS Failed:", err);
+        Swal.fire({
+          icon: 'warning',
+          title: 'จำเป็นต้องเปิด GPS',
+          html: 'ระบบต้องการพิกัดตำแหน่งเพื่อบันทึกงาน<br><b class="text-rose-600">กรุณาเปิด GPS/ตำแหน่ง บนมือถือ</b><br>และอนุญาตสิทธิ์เข้าถึงตำแหน่งก่อนใช้งาน',
+          confirmButtonColor: '#059669',
+          confirmButtonText: '<i class="fa-solid fa-arrows-rotate mr-1"></i> เปิดแล้ว กดลองใหม่',
+          allowOutsideClick: false,
+          allowEscapeKey: false
+        }).then((result) => {
+          if (result.isConfirmed) {
+            initApp();
+          }
+        });
+      }
+    }
 
     /**
      * 🟢 เชื่อมต่อ LINE LIFF และดึงชื่อพนักงานจริงจาก Sheet "Users"
@@ -286,15 +333,11 @@
       const debugStatus = document.getElementById("liffDebugStatus");
       const empInput = document.getElementById("employeeName");
 
-      let hasLocalCache = false;
-
-      // 1. เช็ค LocalStorage ก่อน หากมีข้อมูลผู้ใช้แล้ว ให้แสดงผลทันทีแบบรวดเร็วที่สุด (0.01 วินาที)
       const cached = localStorage.getItem("liff_user_cache");
       if (cached) {
         try {
           const u = JSON.parse(cached);
           if (u && u.userId && u.displayName) {
-            hasLocalCache = true;
             currentLineUserId = u.userId;
             currentEmployeeName = u.employeeName || u.displayName;
             displayEmp.innerText = currentEmployeeName;
@@ -315,26 +358,9 @@
         } catch (e) {}
       }
 
-      // 2. หากยังไม่มีข้อมูลใน Cache (ใช้งานครั้งแรก) ให้ขึ้น Popup โลโก้โหลด "กำลังเชื่อมต่อระบบ..."
-      if (!hasLocalCache) {
-        Swal.fire({
-          title: 'กำลังเชื่อมต่อระบบ...',
-          html: `
-            <div class="py-3 flex flex-col items-center">
-              <i class="fa-solid fa-circle-notch fa-spin text-emerald-600 text-4xl mb-3"></i>
-              <p class="text-sm text-slate-600">กำลังดึงข้อมูลและลงทะเบียนเข้าใช้งาน...</p>
-            </div>
-          `,
-          allowOutsideClick: false,
-          allowEscapeKey: false,
-          showConfirmButton: false
-        });
-      }
-
       try {
         let activeLiffId = (typeof liffId !== "undefined" ? liffId : "").trim();
         if (!activeLiffId || activeLiffId.includes("YOUR_LIFF_ID_HERE")) {
-          if (!hasLocalCache) Swal.close();
           displayEmp.innerText = "ยังไม่ได้ใส่ LIFF ID";
           displayLine.innerText = "ใส่ LIFF ID ในโค้ด";
           debugStatus.innerText = "สถานะ: รอตั้งค่า LIFF ID";
@@ -344,7 +370,6 @@
         }
 
         if (typeof liff === "undefined") {
-          if (!hasLocalCache) Swal.close();
           displayEmp.innerText = "ไม่ได้โหลด LIFF SDK";
           displayLine.innerText = "เปิดผ่านเบราว์เซอร์ทั่วไป";
           debugStatus.innerText = "สถานะ: เบราว์เซอร์ทั่วไป";
@@ -353,7 +378,6 @@
           return;
         }
 
-        // เริ่มต้นเชื่อมต่อ LINE LIFF (ตั้ง Timeout 4 วินาที)
         const initPromise = liff.init({ liffId: activeLiffId });
         const timeoutPromise = new Promise((_, reject) => 
           setTimeout(() => reject(new Error("LIFF_TIMEOUT")), 4000)
@@ -370,7 +394,6 @@
         let lineDisplayName = "ผู้ใช้งาน LINE";
         let pictureUrl = "";
 
-        // ดึง User ID และ Profile
         const context = liff.getContext();
         if (context && context.userId) lineUserId = context.userId;
 
@@ -397,10 +420,8 @@
         displayLine.innerText = lineDisplayName;
         document.getElementById("lineUserId").value = currentLineUserId;
 
-        // ดึงรายการงานค้างเฉพาะของ LINE User ID นี้ทันที
         if (currentLineUserId) fetchActiveJobs(false);
 
-        // ส่งไปสร้าง/อัปเดตข้อมูลใน Sheet "Users" และดึงชื่อแมปจริง
         if (lineUserId && GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
           fetch(GAS_URL, {
             method: "POST",
@@ -414,7 +435,6 @@
           })
           .then(res => res.json())
           .then(res => {
-            if (!hasLocalCache) Swal.close();
             if (res && res.status === "success" && res.employeeName) {
               currentEmployeeName = res.employeeName;
               displayEmp.innerText = res.employeeName;
@@ -425,7 +445,6 @@
                 document.getElementById("mappedBadge").classList.add("hidden");
               }
 
-              // บันทึกใส่ LocalStorage เก็บไว้สำหรับครั้งถัดไป
               localStorage.setItem("liff_user_cache", JSON.stringify({
                 userId: lineUserId,
                 displayName: lineDisplayName,
@@ -438,46 +457,19 @@
             }
           })
           .catch(err => {
-            if (!hasLocalCache) Swal.close();
             debugStatus.innerText = `เชื่อมต่อแล้ว`;
           });
         } else {
-          if (!hasLocalCache) Swal.close();
           debugStatus.innerText = `เชื่อมต่อแล้ว`;
         }
 
       } catch (err) {
         console.error("LIFF Init Error:", err);
-        if (!hasLocalCache) Swal.close();
-        if (!hasLocalCache) {
-          displayEmp.innerText = "ผู้ใช้งานทั่วไป";
-          displayLine.innerText = "เปิดผ่านเบราว์เซอร์ภายนอก";
-          empInput.value = "ผู้ใช้งานทั่วไป";
-          currentEmployeeName = "ผู้ใช้งานทั่วไป";
-        }
+        displayEmp.innerText = "ผู้ใช้งานทั่วไป";
+        displayLine.innerText = "เปิดผ่านเบราว์เซอร์ภายนอก";
+        empInput.value = "ผู้ใช้งานทั่วไป";
+        currentEmployeeName = "ผู้ใช้งานทั่วไป";
       }
-    }
-
-    /**
-     * 🛰️ ขอสิทธิ์และดึงตำแหน่ง GPS เบื้องหลัง
-     */
-    function initGPS(isManualClick) {
-      if (!navigator.geolocation) return;
-
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          currentPosition = {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            accuracy: pos.coords.accuracy
-          };
-          document.getElementById("locationBlockedModal").classList.add("hidden");
-        },
-        (err) => {
-          console.warn("GPS Error:", err);
-        },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
-      );
     }
 
     /**
@@ -545,18 +537,15 @@
       document.getElementById("jobDetails").value = "";
       currentPosition = null;
 
-      initGPS(false);
       fetchActiveJobs(false);
-      startSessionTimeout();
+      initApp();
     }
 
-        function fetchActiveJobs(showToast) {
-      // 🔄 เริ่มหมุนไอคอนโหลดใหม่
+    function fetchActiveJobs(showToast) {
       const reloadIcon = document.getElementById("reloadActiveIcon");
       if (reloadIcon) reloadIcon.classList.add("fa-spin");
 
       const handleActiveSuccess = (res) => {
-        // 🛑 ปิดไอคอนหมุนเมื่อโหลดเสร็จ
         if (reloadIcon) reloadIcon.classList.remove("fa-spin");
         
         if (res && res.status === "success" && Array.isArray(res.data)) {
@@ -578,7 +567,7 @@
             populateActiveJobsDropdown();
           })
           .getActiveCheckIns();
-            } else if (GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
+      } else if (GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
         fetch(GAS_URL, {
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -760,7 +749,6 @@
 
       if (!video || !video.videoWidth) return;
 
-      // 📸 บีบอัดรูปถ่ายความกว้าง 720px คุณภาพ 0.55 (ขนาดไฟล์ ~40-60KB บันทึกไวขึ้น 2 เท่า)
       const maxWidth = 720;
       let targetWidth = video.videoWidth;
       let targetHeight = video.videoHeight;
@@ -883,6 +871,20 @@
     function sendDataToServer(payload) {
       if (timerInterval) clearInterval(timerInterval);
 
+      // ตรวจสอบความพร้อมของพิกัด หากไม่มีจะไม่ยอมให้ส่ง
+      if (!currentPosition || !currentPosition.latitude || !currentPosition.longitude) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'ไม่พบพิกัดตำแหน่ง',
+          text: 'กรุณาเปิด GPS และดึงพิกัดใหม่อีกครั้ง',
+          confirmButtonColor: '#e11d48',
+          confirmButtonText: 'ลองใหม่อีกครั้ง'
+        }).then(() => {
+          initApp();
+        });
+        return;
+      }
+
       Swal.fire({
         title: 'กำลังบันทึกข้อมูล...',
         html: 'กำลังส่งข้อมูลเข้าสู่ระบบ<br><span class="text-xs text-slate-500">กรุณารอสักครู่...</span>',
@@ -894,35 +896,11 @@
       btnSubmit.disabled = true;
       btnSubmit.classList.add("opacity-50");
 
-          // 🛰️ จังหวะที่ 2: ถ้ามีพิกัดจากการเปิดหน้าเว็บอยู่แล้ว ให้ใช้ส่งทันที 0 วิ! ไม่ต้องดึงใหม่
-    if (currentPosition && currentPosition.latitude && currentPosition.longitude) {
+      // ใส่พิกัดที่ดึงไว้แล้วตั้งแต่ตอนเปิดเว็บ ส่งทันที 0 วิ!
       payload.latitude = currentPosition.latitude;
       payload.longitude = currentPosition.longitude;
-      executeServerSubmit(payload, btnSubmit);
-      return;
-    }
 
-    // ถ้ายังไม่มีพิกัด (เช่น เพิ่งเปิดแอปแล้วรีบกดส่งทันที) ให้แอบดึงเบื้องหลังเงียบๆ แล้วส่งข้อมูล
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          currentPosition = {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude
-          };
-          payload.latitude = pos.coords.latitude;
-          payload.longitude = pos.coords.longitude;
-          executeServerSubmit(payload, btnSubmit);
-        },
-        (err) => {
-          console.warn("Silent GPS fallback:", err);
-          executeServerSubmit(payload, btnSubmit);
-        },
-        { enableHighAccuracy: true, timeout: 6000, maximumAge: 120000 }
-      );
-    } else {
       executeServerSubmit(payload, btnSubmit);
-    }
     }
 
     function executeServerSubmit(payload, btnSubmit) {
@@ -975,43 +953,31 @@
           .withFailureHandler(handleSubmitError)
           .submitCheckIn(payload);
       } else if (GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
-              fetch(GAS_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload)
-      })
-      .then(async (response) => {
-        const rawText = await response.text();
-        try {
-          // ลองแปลงเป็น JSON ตามปกติ
-          return JSON.parse(rawText);
-        } catch (parseErr) {
-          // หาก Google ตอบกลับมาเป็นหน้า HTML (จากระบบ Redirect)
-          // แต่ข้อมูลเข้า Sheet แล้ว ให้ถือว่าสำเร็จทันที!
-          if (rawText.includes("<!DOCTYPE") || rawText.includes("<html") || response.ok) {
-            return {
-              status: "success",
-              message: `บันทึก ${payload.actionType || "งาน"} เรียบร้อยแล้ว!`
-            };
+        fetch(GAS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        })
+        .then(async (response) => {
+          const rawText = await response.text();
+          try {
+            return JSON.parse(rawText);
+          } catch (parseErr) {
+            if (rawText.includes("<!DOCTYPE") || rawText.includes("<html") || response.ok) {
+              return {
+                status: "success",
+                message: `บันทึก ${payload.actionType || "งาน"} เรียบร้อยแล้ว!`
+              };
+            }
+            throw parseErr;
           }
-          throw parseErr;
-        }
-      })
-      .then(handleSubmitResult)
-      .catch(handleSubmitError);
+        })
+        .then(handleSubmitResult)
+        .catch(handleSubmitError);
       } else {
         handleSubmitError(new Error("ยังไม่ได้กำหนด URL ของ Google Apps Script ใน GAS_URL"));
       }
     }
   </script>
-
-
-
-
-
-  
 </body>
 </html>
-
-
-
