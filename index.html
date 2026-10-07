@@ -256,9 +256,7 @@
     // ========================================================
     // 👥 1. รายชื่อพนักงานและ LINE User ID (แมปตรงในโค้ด 11 คน)
     // ========================================================
-    // คุณสามารถเปลี่ยน LINE User ID และชื่อจริงของพนักงาน 11 คนได้ที่นี่
     const EMPLOYEE_MAP = {
-      // ตัวอย่าง: "LINE_USER_ID": "ชื่อ-นามสกุล หรือ ชื่อเล่นพนักงาน"
       "U62de4d5f49448d8ede38611d8f0a78e9": "กอล์ฟ",
       "Ub2a53ea129b53062c47c5050f53daef7": "บูม",
       "Ua4c6f28824ff6f5b63af0871ebe5164b": "ไบร์ท",
@@ -410,27 +408,35 @@
       const empInput = document.getElementById("employeeName");
       const mappedBadge = document.getElementById("mappedBadge");
 
-      currentLineUserId = userId || "";
-      document.getElementById("lineUserId").value = currentLineUserId;
+      const cleanUserId = (userId || "").trim();
+      currentLineUserId = cleanUserId;
+      document.getElementById("lineUserId").value = cleanUserId;
 
       if (pictureUrl) {
         document.getElementById("liffUserImg").src = pictureUrl;
       }
       displayLine.innerText = displayName || "LINE Account";
 
-      // ตรวจสอบในตาราง EMPLOYEE_MAP 11 คน
-      if (userId && EMPLOYEE_MAP[userId]) {
-        currentEmployeeName = EMPLOYEE_MAP[userId];
+      // ตรวจสอบในตาราง EMPLOYEE_MAP 11 คน (ค้นหาแบบ case-insensitive & trimmed)
+      let foundName = EMPLOYEE_MAP[cleanUserId];
+      if (!foundName) {
+        // Fallback ค้นหาแบบ ignore case
+        const matchedKey = Object.keys(EMPLOYEE_MAP).find(k => k.trim().toLowerCase() === cleanUserId.toLowerCase());
+        if (matchedKey) foundName = EMPLOYEE_MAP[matchedKey];
+      }
+
+      if (foundName) {
+        currentEmployeeName = foundName;
         displayEmp.innerText = currentEmployeeName;
         empInput.value = currentEmployeeName;
         mappedBadge.classList.remove("hidden");
-        debugStatus.innerText = "เชื่อมต่อแล้ว (ระบุตัวตนถูกต้อง)";
+        debugStatus.innerText = `เชื่อมต่อแล้ว (แมปชื่อ: ${currentEmployeeName})`;
       } else if (displayName && displayName !== "LINE Account" && displayName !== "ผู้ใช้งาน LINE") {
         currentEmployeeName = displayName;
         displayEmp.innerText = currentEmployeeName;
         empInput.value = currentEmployeeName;
         mappedBadge.classList.add("hidden");
-        debugStatus.innerText = "เชื่อมต่อแล้ว (ใช้ชื่อโปรไฟล์ LINE)";
+        debugStatus.innerText = cleanUserId ? `UID: ${cleanUserId.substring(0, 10)}... (ไม่พบในตาราง 11 คน)` : `เชื่อมต่อแล้ว (ใช้ชื่อ LINE)`;
       } else {
         currentEmployeeName = "ผู้ใช้งาน LINE";
         displayEmp.innerText = currentEmployeeName;
@@ -441,7 +447,7 @@
 
       // บันทึก Cache ไว้
       localStorage.setItem("liff_user_cache", JSON.stringify({
-        userId: userId,
+        userId: cleanUserId,
         displayName: displayName,
         employeeName: currentEmployeeName,
         pictureUrl: pictureUrl
