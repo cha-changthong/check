@@ -237,6 +237,26 @@
     </div>
   </div>
 
+  <!-- 🚫 Fullscreen Modal when Opened Outside LINE -->
+  <div id="blockOutsideLineModal" class="hidden fixed inset-0 z-50 bg-slate-900/95 backdrop-blur-lg flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl space-y-4 border border-slate-100">
+      <div class="w-20 h-20 bg-emerald-100 text-[#06C755] rounded-3xl flex items-center justify-center mx-auto text-4xl shadow-inner">
+        <i class="fa-brands fa-line"></i>
+      </div>
+      <h2 class="text-xl font-bold text-slate-800">เปิดใช้งานผ่านแอป LINE เท่านั้น</h2>
+      <p class="text-slate-600 text-sm leading-relaxed">
+        ระบบบันทึกเวลาเข้า-ออกงานนี้ รองรับการกดใช้งานผ่าน <b class="text-emerald-700">Rich Menu ในแอป LINE</b> บนมือถือเท่านั้น<br>
+        <span class="text-rose-500 font-semibold text-xs mt-1 block">ไม่อนุญาตให้เปิดผ่านเบราว์เซอร์ภายนอก</span>
+      </p>
+      <div class="pt-2 space-y-2">
+        <a id="openInLineBtn" href="https://line.me" class="btn-touch w-full bg-[#06C755] hover:bg-[#05b34c] text-white font-bold rounded-2xl shadow-lg shadow-emerald-500/30 active:scale-95 transition flex items-center justify-center space-x-2">
+          <i class="fa-brands fa-line text-2xl"></i>
+          <span>เปิดในแอป LINE</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ========================================================
     // 👥 1. รายชื่อพนักงานและ LINE User ID (แมปตรงในโค้ด 11 คน)
@@ -244,17 +264,17 @@
     // คุณสามารถเปลี่ยน LINE User ID และชื่อจริงของพนักงาน 11 คนได้ที่นี่
     const EMPLOYEE_MAP = {
       // ตัวอย่าง: "LINE_USER_ID": "ชื่อ-นามสกุล หรือ ชื่อเล่นพนักงาน"
-      "U62de4d5f49448d8ede38611d8f0a78e9": "กอล์ฟ",
-      "Ub2a53ea129b53062c47c5050f53daef7": "บูม",
-      "Ua4c6f28824ff6f5b63af0871ebe5164b": "ไบร์ท",
-      "U3d70a6427bc616fac412953b12c75d0e": "ขวัญ",
-      "Ue1e0ffb38b263c2e5108748322de55db": "ตาล",
-      "U2a1c4c887f8aa4875b27d7a23fb75a0c": "มิว",
-      "Uac37f3ba2f8ae96caa28287a8f659c78": "ท๊อป",
-      "U486975e5abfcbdab8948a853fe6642b9": "เรย์",
-      "U37c797ee5eeae6b9355b105dd427cce0": "จูน",
-      "U633f5f1d6ce4cc150c1413b78ccf20d4": "นา",
-      "Ua02bac387bede8a80d2572fab181c8e5": "เกมส์"
+      "U97ea4f9c54e7d41f3d3b7cf093d50001": "สมชาย ใจดี",
+      "U97ea4f9c54e7d41f3d3b7cf093d50002": "สมหญิง รักงาน",
+      "U97ea4f9c54e7d41f3d3b7cf093d50003": "วิชัย มุ่งมั่น",
+      "U97ea4f9c54e7d41f3d3b7cf093d50004": "กานดา สดใส",
+      "U97ea4f9c54e7d41f3d3b7cf093d50005": "ประเสริฐ ชำนาญ",
+      "U97ea4f9c54e7d41f3d3b7cf093d50006": "นภาพร พร้อมเพรียง",
+      "U97ea4f9c54e7d41f3d3b7cf093d50007": "ธีรภัทร ลุยงาน",
+      "U97ea4f9c54e7d41f3d3b7cf093d50008": "ชลธิชา เรียบร้อย",
+      "U97ea4f9c54e7d41f3d3b7cf093d50009": "อนุชา ว่องไว",
+      "U97ea4f9c54e7d41f3d3b7cf093d50010": "ปิยะดา ขยันยิ่ง",
+      "U97ea4f9c54e7d41f3d3b7cf093d50011": "เอกชัย ใส่ใจ"
     };
 
     let currentActionType = "Check-in";
@@ -271,15 +291,22 @@
 
     let currentLineUserId = "";
     let currentEmployeeName = "";
+    let isInsideLineClient = false;
 
     // เริ่มการทำงานทันทีที่เปิดหน้าเว็บ
     document.addEventListener("DOMContentLoaded", () => {
+      // ตั้งค่าปุ่มเปิดใน LINE
+      const openBtn = document.getElementById("openInLineBtn");
+      if (openBtn && liffId && !liffId.includes("YOUR_LIFF_ID_HERE")) {
+        openBtn.href = `https://liff.line.me/${liffId}`;
+      }
+
       updateTheme();
       initLineLiff();
     });
 
     /**
-     * 🟢 เชื่อมต่อ LINE LIFF และดึงชื่อพนักงานจากตาราง EMPLOYEE_MAP ทันที (0.01 วินาที)
+     * 🟢 เชื่อมต่อ LINE LIFF และตรวจสอบว่าเปิดจากในแอป LINE หรือไม่
      */
     async function initLineLiff() {
       const displayEmp = document.getElementById("displayEmployeeName");
@@ -287,17 +314,6 @@
       const debugStatus = document.getElementById("liffDebugStatus");
       const empInput = document.getElementById("employeeName");
       const mappedBadge = document.getElementById("mappedBadge");
-
-      // 1. ตรวจสอบข้อมูลใน LocalStorage Cache ก่อนเพื่อความรวดเร็ว
-      const cached = localStorage.getItem("liff_user_cache");
-      if (cached) {
-        try {
-          const u = JSON.parse(cached);
-          if (u && u.userId) {
-            applyUserIdentity(u.userId, u.displayName || "LINE Account", u.pictureUrl || "");
-          }
-        } catch (e) {}
-      }
 
       try {
         let activeLiffId = (typeof liffId !== "undefined" ? liffId : "").trim();
@@ -307,7 +323,7 @@
         }
 
         if (typeof liff === "undefined") {
-          setFallbackUser("ผู้ใช้งานทั่วไป (เปิดนอก LINE)");
+          blockAccessOutsideLine();
           return;
         }
 
@@ -319,7 +335,16 @@
 
         await Promise.race([initPromise, timeoutPromise]);
 
-        if (!liff.isInClient() && !liff.isLoggedIn()) {
+        // 🚫 ตรวจสอบว่าเปิดในแอป LINE หรือไม่ (In-Client Browser)
+        if (!liff.isInClient()) {
+          // หากเปิดจากเบราว์เซอร์ภายนอก ให้บล็อกการใช้งานทันที
+          blockAccessOutsideLine();
+          return;
+        }
+
+        isInsideLineClient = true;
+
+        if (!liff.isLoggedIn()) {
           liff.login();
           return;
         }
@@ -357,9 +382,26 @@
 
       } catch (err) {
         console.warn("LIFF Init Error:", err);
-        if (!currentEmployeeName) {
+        // หากเชื่อมต่อ LIFF ไม่ผ่านและอยู่นอก LINE
+        if (typeof liff !== "undefined" && !liff.isInClient()) {
+          blockAccessOutsideLine();
+        } else if (!currentEmployeeName) {
           setFallbackUser("ผู้ใช้งานทั่วไป");
         }
+      }
+    }
+
+    /**
+     * 🚫 บล็อกการใช้งานเมื่อเปิดจากนอกแอป LINE
+     */
+    function blockAccessOutsideLine() {
+      isInsideLineClient = false;
+      document.getElementById("blockOutsideLineModal").classList.remove("hidden");
+
+      const btnSubmit = document.getElementById("btnSubmit");
+      if (btnSubmit) {
+        btnSubmit.disabled = true;
+        btnSubmit.classList.add("opacity-40", "cursor-not-allowed");
       }
     }
 
@@ -713,16 +755,21 @@
     }
 
     function handleSubmit() {
+      if (typeof liff !== "undefined" && !liff.isInClient()) {
+        blockAccessOutsideLine();
+        return;
+      }
+
       let employeeName = "";
       let selectedJobId = "";
 
       if (currentActionType === "Check-in") {
         employeeName = document.getElementById("employeeName").value || currentEmployeeName;
-        if (!employeeName || employeeName === "กำลังเชื่อมต่อ LINE...") {
+        if (!employeeName || employeeName === "กำลังเชื่อมต่อ LINE..." || employeeName === "ผู้ใช้งานทั่วไป") {
           Swal.fire({
             icon: 'warning',
-            title: 'กำลังเชื่อมต่อ LINE...',
-            text: 'กรุณารอสักครู่ให้ระบบระบุตัวตนจาก LINE หรือเปิดผ่าน LINE LIFF',
+            title: 'กรุณาเปิดผ่าน LINE',
+            text: 'ระบบจำเป็นต้องระบุตัวตนจาก LINE กรุณากดเข้าผ่าน Rich Menu บนมือถือ',
             confirmButtonColor: '#059669',
             confirmButtonText: 'เข้าใจแล้ว'
           });
