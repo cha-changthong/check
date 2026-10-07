@@ -116,14 +116,9 @@
 
       <!-- 2. [โหมด Check-out] กล่องเลือกงานที่ Check-in ค้างอยู่ -->
       <div id="activeJobWrapper" class="hidden space-y-3">
-        <div class="flex items-center justify-between">
-          <label class="block text-slate-700 font-semibold text-base">
-            <i class="fa-solid fa-clipboard-check text-rose-600 mr-1.5"></i> เลือกงานที่ Check-in ค้างอยู่ <span class="text-red-500">*</span>
-          </label>
-          <button type="button" onclick="fetchActiveJobs(true)" class="text-xs text-rose-600 hover:text-rose-800 font-medium flex items-center bg-rose-50 px-2.5 py-1 rounded-lg">
-            <i id="reloadActiveIcon" class="fa-solid fa-rotate mr-1"></i> โหลดใหม่
-          </button>
-        </div>
+        <label class="block text-slate-700 font-semibold text-base">
+          <i class="fa-solid fa-clipboard-check text-rose-600 mr-1.5"></i> เลือกงานที่ Check-in ค้างอยู่ <span class="text-red-500">*</span>
+        </label>
         <div class="relative">
           <select id="activeJobSelect" onchange="handleActiveJobChange()" class="input-touch w-full px-4 rounded-2xl border-2 border-rose-200 focus:border-rose-500 focus:ring-4 focus:ring-rose-100 outline-none text-slate-800 bg-rose-50/50 font-medium transition cursor-pointer appearance-none truncate">
             <option value="" disabled selected>-- กำลังโหลดรายการงาน... --</option>
@@ -521,15 +516,55 @@
       handleSubmit();
     }
 
-    function fetchActiveJobs(showToast) {
-      const reloadIcon = document.getElementById("reloadActiveIcon");
-      if (reloadIcon) reloadIcon.classList.add("fa-spin");
+    /**
+     * 🔑 คีย์สำหรับเก็บ Active Job ใน LocalStorage แยกตาม User ID
+     */
+    function getActiveJobStorageKey() {
+      return currentLineUserId ? `active_job_${currentLineUserId}` : 'active_job_user';
+    }
 
+    /**
+     * ⚡ โหลดงานที่ Check-in ค้างอยู่จาก LocalStorage ทันที (0.00 วินาที)
+     */
+    function loadActiveJobFromCache() {
+      try {
+        const cachedStr = localStorage.getItem(getActiveJobStorageKey());
+        if (cachedStr) {
+          const job = JSON.parse(cachedStr);
+          if (job && job.jobId) {
+            activeJobsList = [job];
+            populateActiveJobsDropdown();
+            const select = document.getElementById("activeJobSelect");
+            if (select) {
+              select.value = job.jobId;
+              handleActiveJobChange();
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("loadActiveJobFromCache error:", e);
+      }
+    }
+
+    /**
+     * 🔄 ดึงรายการงานที่ Check-in ค้างอยู่จาก Server (ทำงานเบื้องหลัง)
+     */
+    function fetchActiveJobs(showToast) {
       const handleActiveSuccess = (res) => {
-        if (reloadIcon) reloadIcon.classList.remove("fa-spin");
-        
         if (res && res.status === "success" && Array.isArray(res.data)) {
           activeJobsList = res.data;
+          
+          if (activeJobsList.length > 0) {
+            try {
+              // ซิงค์บันทึกลง Cache
+              localStorage.setItem(getActiveJobStorageKey(), JSON.stringify(activeJobsList[0]));
+            } catch (e) {}
+          } else {
+            try {
+              localStorage.removeItem(getActiveJobStorageKey());
+            } catch (e) {}
+          }
+
           populateActiveJobsDropdown();
           if (showToast) {
             Swal.fire({ icon: 'success', title: 'อัปเดตรายการงานสำเร็จ', timer: 1000, showConfirmButton: false });
@@ -543,7 +578,6 @@
         google.script.run
           .withSuccessHandler(handleActiveSuccess)
           .withFailureHandler(() => {
-            if (reloadIcon) reloadIcon.classList.remove("fa-spin");
             populateActiveJobsDropdown();
           })
           .getActiveCheckIns(currentLineUserId);
@@ -568,27 +602,33 @@
           .then(handleActiveSuccess)
           .catch(err => {
             console.warn("fetchActiveJobs error:", err);
-            if (reloadIcon) reloadIcon.classList.remove("fa-spin");
             populateActiveJobsDropdown();
           });
-      } else {
-        if (reloadIcon) reloadIcon.classList.remove("fa-spin");
       }
     }
 
     function populateActiveJobsDropdown() {
       const select = document.getElementById("activeJobSelect");
+      if (!select) return;
+
       if (activeJobsList.length === 0) {
         select.innerHTML = '<option value="" disabled selected>-- ไม่มีงานที่ Check-in ค้างอยู่ --</option>';
         document.getElementById("selectedJobInfoCard").classList.add("hidden");
         return;
       }
-      let html = '<option value="" disabled selected>-- เลือกงานที่ต้องการ Check-out --</option>';
+
+      let html = '<option value="" disabled>-- เลือกงานที่ต้องการ Check-out --</option>';
       activeJobsList.forEach((job) => {
-        const shortDetail = job.checkInDetails.length > 25 ? job.checkInDetails.substring(0, 25) + "..." : job.checkInDetails;
+        const shortDetail = (job.checkInDetails && job.checkInDetails.length > 25) ? job.checkInDetails.substring(0, 25) + "..." : (job.checkInDetails || "-");
         html += `<option value="${job.jobId}">👤 ${job.employeeName} (${job.checkInTime}) - ${shortDetail}</option>`;
       });
       select.innerHTML = html;
+
+      // ⚡ ถ้ามีงานค้างอยู่ เลือกให้อัตโนมัติทันที
+      if (activeJobsList.length > 0) {
+        select.value = activeJobsList[0].jobId;
+        handleActiveJobChange();
+      }
     }
 
     function handleActiveJobChange() {
@@ -596,8 +636,8 @@
       const job = activeJobsList.find(j => j.jobId === select.value);
       const infoCard = document.getElementById("selectedJobInfoCard");
       if (job) {
-        document.getElementById("infoEmpName").innerText = job.employeeName;
-        document.getElementById("infoCheckInTime").innerText = job.checkInTime;
+        document.getElementById("infoEmpName").innerText = job.employeeName || "-";
+        document.getElementById("infoCheckInTime").innerText = job.checkInTime || "-";
         document.getElementById("infoJobDetails").innerText = job.checkInDetails || "-";
         infoCard.classList.remove("hidden");
       } else {
@@ -607,7 +647,12 @@
 
     function switchActionType(type) {
       currentActionType = type;
-      if (type === "Check-out") fetchActiveJobs(false);
+      if (type === "Check-out") {
+        // ⚡ 1. โหลดจาก LocalStorage ทันที 0.00 วินาที
+        loadActiveJobFromCache();
+        // 🔄 2. ซิงค์กับ Server เบื้องหลัง
+        fetchActiveJobs(false);
+      }
       updateTheme();
     }
 
@@ -908,6 +953,29 @@
         btnSubmit.classList.remove("opacity-50");
 
         if (res && res.status === "success") {
+          // ⚡ จัดการ Cache งานค้างใน LocalStorage
+          if (payload.actionType === "Check-in") {
+            const now = new Date();
+            const timeStr = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+            const savedJob = {
+              jobId: res.jobId || `JOB-${Date.now()}`,
+              employeeName: payload.employeeName,
+              checkInTime: timeStr,
+              checkInDetails: payload.jobDetails || "-"
+            };
+            try {
+              localStorage.setItem(getActiveJobStorageKey(), JSON.stringify(savedJob));
+            } catch(e) {}
+            activeJobsList = [savedJob];
+            populateActiveJobsDropdown();
+          } else if (payload.actionType === "Check-out") {
+            try {
+              localStorage.removeItem(getActiveJobStorageKey());
+            } catch(e) {}
+            activeJobsList = [];
+            populateActiveJobsDropdown();
+          }
+
           Swal.fire({
             icon: 'success',
             title: 'สำเร็จ!',
