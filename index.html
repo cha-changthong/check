@@ -99,7 +99,7 @@
           <div class="flex-1 min-w-0">
             <div class="flex items-center space-x-1.5">
               <h3 id="displayEmployeeName" class="font-bold text-slate-800 text-lg truncate">กำลังเชื่อมต่อ LINE...</h3>
-              <span id="mappedBadge" class="hidden text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold border border-emerald-200">เชื่อมต่อ..</span>
+              <span id="mappedBadge" class="hidden text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold border border-emerald-200">แมปชื่อแล้ว</span>
             </div>
             <p id="displayLineName" class="text-xs text-slate-500 truncate flex items-center mt-0.5">
               <i class="fa-brands fa-line text-emerald-500 mr-1 text-sm"></i>
@@ -180,19 +180,12 @@
         <textarea id="jobDetails" rows="3" placeholder="ระบุรายละเอียด..." class="w-full p-4 rounded-2xl border-2 border-slate-200 focus:border-slate-500 focus:ring-4 focus:ring-slate-100 outline-none text-slate-800 bg-slate-50 font-normal text-base transition resize-none"></textarea>
       </div>
 
-      <!-- Submit Button & Live Timer -->
+      <!-- Submit Button -->
       <div class="pt-2">
         <button id="btnSubmit" onclick="handleSubmit()" type="button" class="btn-touch w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-xl shadow-emerald-500/25 active:scale-[0.98] transition flex items-center justify-center space-x-2 text-lg theme-transition">
           <i id="btnSubmitIcon" class="fa-solid fa-paper-plane"></i>
           <span id="btnSubmitText">ส่งงาน Check-in (เข้างาน)</span>
         </button>
-
-        <!-- ⏱️ Live Countdown Timer  -->
-        <div class="flex items-center justify-center space-x-1.5 mt-2.5 text-xs text-slate-400 select-none">
-          <i class="fa-regular fa-clock text-[11px]"></i>
-          <span>หมดเวลาใน:</span>
-          <span id="timerCountdownText" class="font-semibold text-slate-500 tracking-wider">03:00</span>
-        </div>
       </div>
 
     </div>
@@ -225,9 +218,46 @@
     </div>
   </div>
 
+  <!-- Fullscreen Modal when Location is Blocked -->
+  <div id="locationBlockedModal" class="hidden fixed inset-0 z-50 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl space-y-4">
+      <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-3xl shadow-inner">
+        <i class="fa-solid fa-location-dot"></i>
+      </div>
+      <h2 class="text-xl font-bold text-slate-800">จำเป็นต้องเปิดตำแหน่ง (GPS)</h2>
+      <p class="text-slate-600 text-sm leading-relaxed">
+        ระบบต้องการสิทธิ์เข้าถึงพิกัดตำแหน่งเพื่อบันทึกงาน<br>
+        กรุณาเปิด GPS บนมือถือ และอนุญาตสิทธิ์ในเบราว์เซอร์
+      </p>
+      <div class="pt-2 space-y-2">
+        <button onclick="retryLocationPermission()" class="btn-touch w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-lg active:scale-95 transition">
+          <i class="fa-solid fa-location-arrow mr-1.5"></i> เปิดแล้ว ลองใหม่อีกครั้ง
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    // ========================================================
+    // 👥 1. รายชื่อพนักงานและ LINE User ID (แมปตรงในโค้ด 11 คน)
+    // ========================================================
+    // คุณสามารถเปลี่ยน LINE User ID และชื่อจริงของพนักงาน 11 คนได้ที่นี่
+    const EMPLOYEE_MAP = {
+      // ตัวอย่าง: "LINE_USER_ID": "ชื่อ-นามสกุล หรือ ชื่อเล่นพนักงาน"
+      "U62de4d5f49448d8ede38611d8f0a78e9": "กอล์ฟ",
+      "Ub2a53ea129b53062c47c5050f53daef7": "บูม",
+      "Ua4c6f28824ff6f5b63af0871ebe5164b": "ไบร์ท",
+      "U3d70a6427bc616fac412953b12c75d0e": "ขวัญ",
+      "Ue1e0ffb38b263c2e5108748322de55db": "ตาล",
+      "U2a1c4c887f8aa4875b27d7a23fb75a0c": "มิว",
+      "Uac37f3ba2f8ae96caa28287a8f659c78": "ท๊อป",
+      "U486975e5abfcbdab8948a853fe6642b9": "เรย์",
+      "U37c797ee5eeae6b9355b105dd427cce0": "จูน",
+      "U633f5f1d6ce4cc150c1413b78ccf20d4": "นา",
+      "Ua02bac387bede8a80d2572fab181c8e5": "เกมส์"
+    };
+
     let currentActionType = "Check-in";
-    let currentPosition = null;
     let base64Image = null;
     let imageMimeType = "image/jpeg";
     
@@ -235,125 +265,36 @@
     let currentFacingMode = "environment";
     let activeJobsList = [];
 
-    // 🌐 ตั้งค่า URL สำหรับ GitHub Pages และ LINE LIFF
+    // 🌐 ตั้งค่า URL สำหรับ Google Apps Script และ LINE LIFF
     const GAS_URL = "https://script.google.com/macros/s/AKfycbxIadAegPme3e6ESzN9GsmTZbrUILtOyajVTcXcEFNaC_HnxCli1Uls5juL8s7KrS3t/exec";
     let liffId = "2011269941-XEOw8aRR";
 
     let currentLineUserId = "";
     let currentEmployeeName = "";
 
-    // ⏱️ ตัวแปรนับเวลาถอยหลัง 3.00 นาที (180 วินาที)
-    let timerInterval = null;
-    let remainingSeconds = 180;
-
     // เริ่มการทำงานทันทีที่เปิดหน้าเว็บ
     document.addEventListener("DOMContentLoaded", () => {
       updateTheme();
-      initApp();
+      initLineLiff();
     });
 
     /**
-     * 🚀 ตรวจความพร้อมของระบบ: ดึงพิกัด GPS และเชื่อมต่อ LINE LIFF ตั้งแต่เปิดเว็บ
-     */
-    async function initApp() {
-      Swal.fire({
-        title: 'กำลังเปิดระบบ รอสักครู่...',
-        html: `
-          <div class="py-4 flex flex-col items-center">
-            <i class="fa-solid fa-circle-notch fa-spin text-emerald-600 text-5xl mb-3"></i>
-            <p class="text-sm font-semibold text-slate-700">กำลังระบุพิกัด GPS และเชื่อมต่อระบบ...</p>
-            <p class="text-xs text-slate-400 mt-1">กรุณารอสักครู่ ห้ามปิดหน้านี้</p>
-          </div>
-        `,
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        showConfirmButton: false
-      });
-
-      const liffTask = initLineLiff();
-
-      const gpsTask = new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-          reject(new Error("อุปกรณ์ไม่รองรับระบบ GPS"));
-          return;
-        }
-
-        const onGpsSuccess = (pos) => {
-          currentPosition = {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            accuracy: pos.coords.accuracy
-          };
-          resolve(currentPosition);
-        };
-
-        // ชั้นที่ 1: ดึงแบบแม่นยำสูง (ดาวเทียม)
-        navigator.geolocation.getCurrentPosition(
-          onGpsSuccess,
-          () => {
-            // ชั้นที่ 2: ถ้าดาวเทียมไม่ติด (อยู่ในตึก/อาคาร) ให้สลับใช้ Wi-Fi/เสาสัญญาณทันที
-            navigator.geolocation.getCurrentPosition(
-              onGpsSuccess,
-              (err) => reject(err),
-              { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
-            );
-          },
-          { enableHighAccuracy: true, timeout: 4000, maximumAge: 300000 }
-        );
-      });
-
-      try {
-        await Promise.all([gpsTask, liffTask]);
-        Swal.close();
-        startSessionTimeout();
-      } catch (err) {
-        console.warn("Init GPS Failed:", err);
-        Swal.fire({
-          icon: 'warning',
-          title: 'จำเป็นต้องเปิด GPS',
-          html: 'ระบบต้องการพิกัดตำแหน่งเพื่อบันทึกงาน<br><b class="text-rose-600">กรุณาเปิด GPS/ตำแหน่ง บนมือถือ</b><br>และอนุญาตสิทธิ์เข้าถึงตำแหน่งก่อนใช้งาน',
-          confirmButtonColor: '#059669',
-          confirmButtonText: '<i class="fa-solid fa-arrows-rotate mr-1"></i> เปิดแล้ว กดลองใหม่',
-          allowOutsideClick: false,
-          allowEscapeKey: false
-        }).then((result) => {
-          if (result.isConfirmed) {
-            initApp();
-          }
-        });
-      }
-    }
-
-    /**
-     * 🟢 เชื่อมต่อ LINE LIFF และดึงชื่อพนักงานจริงจาก Sheet "Users"
+     * 🟢 เชื่อมต่อ LINE LIFF และดึงชื่อพนักงานจากตาราง EMPLOYEE_MAP ทันที (0.01 วินาที)
      */
     async function initLineLiff() {
       const displayEmp = document.getElementById("displayEmployeeName");
       const displayLine = document.getElementById("lineDisplayNameText");
       const debugStatus = document.getElementById("liffDebugStatus");
       const empInput = document.getElementById("employeeName");
+      const mappedBadge = document.getElementById("mappedBadge");
 
+      // 1. ตรวจสอบข้อมูลใน LocalStorage Cache ก่อนเพื่อความรวดเร็ว
       const cached = localStorage.getItem("liff_user_cache");
       if (cached) {
         try {
           const u = JSON.parse(cached);
-          if (u && u.userId && u.displayName) {
-            currentLineUserId = u.userId;
-            currentEmployeeName = u.employeeName || u.displayName;
-            displayEmp.innerText = currentEmployeeName;
-            displayLine.innerText = u.displayName;
-            empInput.value = currentEmployeeName;
-            if (u.isMapped) {
-              document.getElementById("mappedBadge").classList.remove("hidden");
-            } else {
-              document.getElementById("mappedBadge").classList.add("hidden");
-            }
-            document.getElementById("lineUserId").value = u.userId;
-            if (u.pictureUrl) {
-              document.getElementById("liffUserImg").src = u.pictureUrl;
-            }
-            debugStatus.innerText = `เชื่อมต่อแล้ว`;
-            fetchActiveJobs(false);
+          if (u && u.userId) {
+            applyUserIdentity(u.userId, u.displayName || "LINE Account", u.pictureUrl || "");
           }
         } catch (e) {}
       }
@@ -361,26 +302,19 @@
       try {
         let activeLiffId = (typeof liffId !== "undefined" ? liffId : "").trim();
         if (!activeLiffId || activeLiffId.includes("YOUR_LIFF_ID_HERE")) {
-          displayEmp.innerText = "ยังไม่ได้ใส่ LIFF ID";
-          displayLine.innerText = "ใส่ LIFF ID ในโค้ด";
-          debugStatus.innerText = "สถานะ: รอตั้งค่า LIFF ID";
-          empInput.value = "ผู้ทดสอบระบบ";
-          currentEmployeeName = "ผู้ทดสอบระบบ";
+          setFallbackUser("ผู้ทดสอบระบบ (ยังไม่ตั้ง LIFF ID)");
           return;
         }
 
         if (typeof liff === "undefined") {
-          displayEmp.innerText = "ไม่ได้โหลด LIFF SDK";
-          displayLine.innerText = "เปิดผ่านเบราว์เซอร์ทั่วไป";
-          debugStatus.innerText = "สถานะ: เบราว์เซอร์ทั่วไป";
-          empInput.value = "ผู้ใช้งานทั่วไป";
-          currentEmployeeName = "ผู้ใช้งานทั่วไป";
+          setFallbackUser("ผู้ใช้งานทั่วไป (เปิดนอก LINE)");
           return;
         }
 
+        // เริ่มต้นเชื่อมต่อ LINE LIFF (Timeout 3.5 วินาที)
         const initPromise = liff.init({ liffId: activeLiffId });
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("LIFF_TIMEOUT")), 4000)
+          setTimeout(() => reject(new Error("LIFF_TIMEOUT")), 3500)
         );
 
         await Promise.race([initPromise, timeoutPromise]);
@@ -415,130 +349,134 @@
           } catch (tokenErr) {}
         }
 
-        currentLineUserId = lineUserId;
-        if (pictureUrl) document.getElementById("liffUserImg").src = pictureUrl;
-        displayLine.innerText = lineDisplayName;
-        document.getElementById("lineUserId").value = currentLineUserId;
+        // 🎯 กำหนดตัวตนพนักงาน (เช็คจาก EMPLOYEE_MAP ในโค้ดทันที)
+        applyUserIdentity(lineUserId, lineDisplayName, pictureUrl);
 
+        // ดึงรายการงานค้างเฉพาะของ LINE User ID นี้
         if (currentLineUserId) fetchActiveJobs(false);
 
-        if (lineUserId && GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
-          fetch(GAS_URL, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({
-              action: "getEmployeeProfile",
-              userId: lineUserId,
-              displayName: lineDisplayName,
-              pictureUrl: pictureUrl
-            })
-          })
-          .then(res => res.json())
-          .then(res => {
-            if (res && res.status === "success" && res.employeeName) {
-              currentEmployeeName = res.employeeName;
-              displayEmp.innerText = res.employeeName;
-              empInput.value = res.employeeName;
-              if (res.isMapped) {
-                document.getElementById("mappedBadge").classList.remove("hidden");
-              } else {
-                document.getElementById("mappedBadge").classList.add("hidden");
-              }
-
-              localStorage.setItem("liff_user_cache", JSON.stringify({
-                userId: lineUserId,
-                displayName: lineDisplayName,
-                employeeName: res.employeeName,
-                isMapped: res.isMapped,
-                pictureUrl: pictureUrl
-              }));
-
-              debugStatus.innerText = `เชื่อมต่อแล้ว`;
-            }
-          })
-          .catch(err => {
-            debugStatus.innerText = `เชื่อมต่อแล้ว`;
-          });
-        } else {
-          debugStatus.innerText = `เชื่อมต่อแล้ว`;
-        }
-
       } catch (err) {
-        console.error("LIFF Init Error:", err);
-        displayEmp.innerText = "ผู้ใช้งานทั่วไป";
-        displayLine.innerText = "เปิดผ่านเบราว์เซอร์ภายนอก";
-        empInput.value = "ผู้ใช้งานทั่วไป";
-        currentEmployeeName = "ผู้ใช้งานทั่วไป";
+        console.warn("LIFF Init Error:", err);
+        if (!currentEmployeeName) {
+          setFallbackUser("ผู้ใช้งานทั่วไป");
+        }
       }
     }
 
     /**
-     * ⏱️ เริ่มนับเวลาถอยหลัง 3.00 นาที (3.00 -> 00:00)
+     * 👤 แมปชื่อพนักงานจาก EMPLOYEE_MAP ทันทีโดยไม่ต้องต่อ API Sheet
      */
-    function startSessionTimeout() {
-      if (timerInterval) clearInterval(timerInterval);
-      remainingSeconds = 180;
-      updateTimerDisplay();
+    function applyUserIdentity(userId, displayName, pictureUrl) {
+      const displayEmp = document.getElementById("displayEmployeeName");
+      const displayLine = document.getElementById("lineDisplayNameText");
+      const debugStatus = document.getElementById("liffDebugStatus");
+      const empInput = document.getElementById("employeeName");
+      const mappedBadge = document.getElementById("mappedBadge");
 
-      timerInterval = setInterval(() => {
-        remainingSeconds--;
-        updateTimerDisplay();
+      currentLineUserId = userId || "";
+      document.getElementById("lineUserId").value = currentLineUserId;
 
-        if (remainingSeconds <= 0) {
-          clearInterval(timerInterval);
-          timerInterval = null;
-          triggerTimeoutExpired();
-        }
-      }, 1000);
-    }
-
-    function updateTimerDisplay() {
-      const display = document.getElementById("timerCountdownText");
-      if (!display) return;
-
-      const mins = Math.floor(remainingSeconds / 60);
-      const secs = remainingSeconds % 60;
-      const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-      display.innerText = formatted;
-
-      if (remainingSeconds <= 20) {
-        display.className = "font-bold text-rose-500 tracking-wider animate-pulse";
-      } else {
-        display.className = "font-semibold text-slate-500 tracking-wider";
+      if (pictureUrl) {
+        document.getElementById("liffUserImg").src = pictureUrl;
       }
+      displayLine.innerText = displayName || "LINE Account";
+
+      // ตรวจสอบในตาราง EMPLOYEE_MAP 11 คน
+      if (userId && EMPLOYEE_MAP[userId]) {
+        currentEmployeeName = EMPLOYEE_MAP[userId];
+        displayEmp.innerText = currentEmployeeName;
+        empInput.value = currentEmployeeName;
+        mappedBadge.classList.remove("hidden");
+        debugStatus.innerText = "เชื่อมต่อแล้ว (ระบุตัวตนถูกต้อง)";
+      } else if (displayName && displayName !== "LINE Account" && displayName !== "ผู้ใช้งาน LINE") {
+        currentEmployeeName = displayName;
+        displayEmp.innerText = currentEmployeeName;
+        empInput.value = currentEmployeeName;
+        mappedBadge.classList.add("hidden");
+        debugStatus.innerText = "เชื่อมต่อแล้ว (ใช้ชื่อโปรไฟล์ LINE)";
+      } else {
+        currentEmployeeName = "ผู้ใช้งาน LINE";
+        displayEmp.innerText = currentEmployeeName;
+        empInput.value = currentEmployeeName;
+        mappedBadge.classList.add("hidden");
+        debugStatus.innerText = "เชื่อมต่อแล้ว";
+      }
+
+      // บันทึก Cache ไว้
+      localStorage.setItem("liff_user_cache", JSON.stringify({
+        userId: userId,
+        displayName: displayName,
+        employeeName: currentEmployeeName,
+        pictureUrl: pictureUrl
+      }));
     }
 
-    function triggerTimeoutExpired() {
-      stopLiveCamera();
-      currentPosition = null;
+    function setFallbackUser(defaultName) {
+      const displayEmp = document.getElementById("displayEmployeeName");
+      const empInput = document.getElementById("employeeName");
+      const debugStatus = document.getElementById("liffDebugStatus");
 
-      Swal.fire({
-        icon: 'warning',
-        title: 'หมดเวลาใช้งานระบบแล้ว',
-        html: 'กรุณากดปุ่มด้านล่าง เพื่อเริ่มใหม่',
-        confirmButtonText: 'คลิกเริ่มใหม่',
-        confirmButtonColor: '#2563eb',
-        allowOutsideClick: false,
-        allowEscapeKey: false
-      }).then((result) => {
-        if (result.isConfirmed) {
-          handleTimeoutRefresh();
+      currentEmployeeName = defaultName;
+      displayEmp.innerText = defaultName;
+      empInput.value = defaultName;
+      debugStatus.innerText = "เปิดผ่านเบราว์เซอร์ภายนอก";
+    }
+
+    /**
+     * 🛰️ ฟังก์ชันขอพิกัด GPS แบบสด ณ เวลาที่กดส่งงาน
+     */
+    function getFreshLocation() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("อุปกรณ์ไม่รองรับระบบ GPS"));
+          return;
         }
+
+        const optionsHigh = {
+          enableHighAccuracy: true,
+          timeout: 7000,
+          maximumAge: 0 // บังคับดึงพิกัดสดใหม่ทันที
+        };
+
+        const optionsFallback = {
+          enableHighAccuracy: false,
+          timeout: 5000,
+          maximumAge: 30000
+        };
+
+        // ชั้นที่ 1: พยายามดึง GPS ความแม่นยำสูง
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            resolve({
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              accuracy: pos.coords.accuracy
+            });
+          },
+          (err) => {
+            // ชั้นที่ 2: ถ้าติดขัด (อยู่ในอาคาร) สลับใช้ Wi-Fi/Cellular ทันที
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                resolve({
+                  latitude: pos.coords.latitude,
+                  longitude: pos.coords.longitude,
+                  accuracy: pos.coords.accuracy
+                });
+              },
+              (fallbackErr) => {
+                reject(fallbackErr);
+              },
+              optionsFallback
+            );
+          },
+          optionsHigh
+        );
       });
     }
 
-    function handleTimeoutRefresh() {
-      const activeJobSelect = document.getElementById("activeJobSelect");
-      if (activeJobSelect) activeJobSelect.selectedIndex = 0;
-      document.getElementById("selectedJobInfoCard").classList.add("hidden");
-      document.getElementById("previewContainer").classList.add("hidden");
-      document.getElementById("previewImage").src = "";
-      base64Image = null;
-      document.getElementById("jobDetails").value = "";
-      currentPosition = null;
-
-      fetchActiveJobs(false);
-      initApp();
+    function retryLocationPermission() {
+      document.getElementById("locationBlockedModal").classList.add("hidden");
+      handleSubmit();
     }
 
     function fetchActiveJobs(showToast) {
@@ -566,7 +504,7 @@
             if (reloadIcon) reloadIcon.classList.remove("fa-spin");
             populateActiveJobsDropdown();
           })
-          .getActiveCheckIns();
+          .getActiveCheckIns(currentLineUserId);
       } else if (GAS_URL && !GAS_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_URL_HERE")) {
         fetch(GAS_URL, {
           method: "POST",
@@ -653,7 +591,7 @@
         tabCheckOut.className = "py-3 px-4 rounded-xl font-bold text-base flex items-center justify-center space-x-2 transition-all duration-300 text-slate-600 hover:text-slate-900";
         headerSection.className = "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-6 text-white text-center relative shadow-md theme-transition";
         headerTitle.innerText = "Check-in เข้างาน";
-        headerSubtitle.innerText = "บันทึกเวลาเข้างาน และรูปถ่าย";
+        headerSubtitle.innerText = "บันทึกเวลาเข้างาน พิกัด และรูปถ่ายสถานที่";
         headerSubtitle.className = "text-emerald-100 text-sm mt-1";
         headerIcon.className = "fa-solid fa-business-time text-2xl text-white";
         btnSubmit.className = "btn-touch w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-xl shadow-emerald-500/25 active:scale-[0.98] transition flex items-center justify-center space-x-2 text-lg theme-transition";
@@ -749,7 +687,8 @@
 
       if (!video || !video.videoWidth) return;
 
-      const maxWidth = 720;
+      // บีบอัดขนาดความกว้างสูงสุด 960px เพื่อให้ไฟล์มีขนาดกะทัดรัด (ประมาณ 100-150KB) ส่งเร็วทันใจ
+      const maxWidth = 960;
       let targetWidth = video.videoWidth;
       let targetHeight = video.videoHeight;
 
@@ -764,7 +703,7 @@
       ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
 
       imageMimeType = "image/jpeg";
-      base64Image = canvas.toDataURL("image/jpeg", 0.55);
+      base64Image = canvas.toDataURL("image/jpeg", 0.65);
 
       const previewImage = document.getElementById("previewImage");
       previewImage.src = base64Image;
@@ -853,14 +792,12 @@
         cancelButtonText: 'ยกเลิก'
       }).then((result) => {
         if (result.isConfirmed) {
-          sendDataToServer({
+          sendDataWithFreshGPS({
             actionType: currentActionType,
             employeeName: employeeName,
             lineUserId: currentLineUserId,
             jobId: selectedJobId,
             jobDetails: jobDetails,
-            latitude: currentPosition ? currentPosition.latitude : 0,
-            longitude: currentPosition ? currentPosition.longitude : 0,
             imageBase64: base64Image,
             mimeType: imageMimeType
           });
@@ -868,39 +805,54 @@
       });
     }
 
-    function sendDataToServer(payload) {
-      if (timerInterval) clearInterval(timerInterval);
-
-      // ตรวจสอบความพร้อมของพิกัด หากไม่มีจะไม่ยอมให้ส่ง
-      if (!currentPosition || !currentPosition.latitude || !currentPosition.longitude) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'ไม่พบพิกัดตำแหน่ง',
-          text: 'กรุณาเปิด GPS และดึงพิกัดใหม่อีกครั้ง',
-          confirmButtonColor: '#e11d48',
-          confirmButtonText: 'ลองใหม่อีกครั้ง'
-        }).then(() => {
-          initApp();
-        });
-        return;
-      }
-
+    /**
+     * 🚀 ขอ GPS สดใหม่ ณ วินาทีที่กดยืนยัน แล้วส่งข้อมูลทันที
+     */
+    async function sendDataWithFreshGPS(payload) {
       Swal.fire({
-        title: 'กำลังบันทึกข้อมูล...',
-        html: 'กำลังส่งข้อมูลเข้าสู่ระบบ<br><span class="text-xs text-slate-500">กรุณารอสักครู่...</span>',
+        title: 'กำลังระบุพิกัดและบันทึก...',
+        html: `
+          <div class="py-3 flex flex-col items-center">
+            <i class="fa-solid fa-location-crosshairs fa-spin text-emerald-600 text-4xl mb-3"></i>
+            <p class="text-sm font-semibold text-slate-700">กำลังดึงพิกัด GPS ปัจจุบัน...</p>
+            <p class="text-xs text-slate-400 mt-1">กรุณารอสักครู่ ห้ามปิดหน้านี้</p>
+          </div>
+        `,
         allowOutsideClick: false,
-        didOpen: () => { Swal.showLoading(); }
+        allowEscapeKey: false,
+        showConfirmButton: false
       });
 
       const btnSubmit = document.getElementById("btnSubmit");
       btnSubmit.disabled = true;
       btnSubmit.classList.add("opacity-50");
 
-      // ใส่พิกัดที่ดึงไว้แล้วตั้งแต่ตอนเปิดเว็บ ส่งทันที 0 วิ!
-      payload.latitude = currentPosition.latitude;
-      payload.longitude = currentPosition.longitude;
+      try {
+        // ขอพิกัดสดทันทีตอนกดส่ง
+        const position = await getFreshLocation();
+        payload.latitude = position.latitude;
+        payload.longitude = position.longitude;
 
-      executeServerSubmit(payload, btnSubmit);
+        Swal.update({
+          title: 'กำลังบันทึกข้อมูล...',
+          html: `
+            <div class="py-3 flex flex-col items-center">
+              <i class="fa-solid fa-cloud-arrow-up fa-bounce text-emerald-600 text-4xl mb-3"></i>
+              <p class="text-sm font-semibold text-slate-700">กำลังอัปโหลดรูปภาพและส่งข้อมูล...</p>
+            </div>
+          `
+        });
+
+        executeServerSubmit(payload, btnSubmit);
+      } catch (gpsError) {
+        console.warn("GPS Request Error:", gpsError);
+        btnSubmit.disabled = false;
+        btnSubmit.classList.remove("opacity-50");
+        Swal.close();
+
+        // แจ้งเตือนให้เปิด GPS
+        document.getElementById("locationBlockedModal").classList.remove("hidden");
+      }
     }
 
     function executeServerSubmit(payload, btnSubmit) {
@@ -916,16 +868,15 @@
             confirmButtonColor: currentActionType === 'Check-in' ? '#059669' : '#e11d48',
             confirmButtonText: 'ตกลง'
           }).then(() => {
+            // ล้างฟอร์ม
             document.getElementById("jobDetails").value = "";
             document.getElementById("previewContainer").classList.add("hidden");
             document.getElementById("previewImage").src = "";
             document.getElementById("selectedJobInfoCard").classList.add("hidden");
             base64Image = null;
             fetchActiveJobs(false);
-            startSessionTimeout();
           });
         } else {
-          startSessionTimeout();
           Swal.fire({
             icon: 'error',
             title: 'เกิดข้อผิดพลาด',
@@ -938,7 +889,6 @@
       const handleSubmitError = (err) => {
         btnSubmit.disabled = false;
         btnSubmit.classList.remove("opacity-50");
-        startSessionTimeout();
         Swal.fire({
           icon: 'error',
           title: 'เชื่อมต่อล้มเหลว',
@@ -981,3 +931,6 @@
   </script>
 </body>
 </html>
+
+
+
